@@ -1,0 +1,278 @@
+@use 'variables' as *;
+
+// ============================================================
+// User Profile Page (profile.php)
+// ============================================================
+
+.profile-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+// --- Profile Header ----------------------------------------
+.profile-hero {
+  background: $gradient-primary;
+  border-radius: $radius-xl;
+  padding: $space-10 $space-8;
+  display: flex;
+  align-items: center;
+  gap: $space-8;
+  margin-bottom: $space-6;
+  position: relative;
+  overflow: hidden;
+  color: $text-light;
+
+  &::before {
+    content: '';
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(255,255,255,0.1), transparent);
+    right: -50px;
+    top: -50px;
+    border-radius: 50%;
+  }
+
+  .profile-avatar-wrapper {
+    position: relative;
+    z-index: 1;
+
+    .profile-avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: $font-size-4xl;
+      font-weight: 900;
+      color: $text-light;
+      border: 4px solid rgba(255,255,255,0.4);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+      text-transform: uppercase;
+    }
+
+    .avatar-edit-btn {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 32px;
+      height: 32px;
+      background: $bg-surface;
+      color: $accent-primary;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.6);
+      transition: $transition-fast;
+
+      &:hover { transform: scale(1.1); }
+    }
+  }
+
+  .profile-info {
+    z-index: 1;
+
+    h2 {
+      font-size: $font-size-3xl;
+      font-weight: 800;
+      color: $text-light;
+      margin-bottom: $space-2;
+    }
+
+    .profile-email {
+      font-size: $font-size-sm;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: $space-3;
+      display: flex;
+      align-items: center;
+      gap: $space-2;
+    }
+
+    .profile-badges {
+      display: flex;
+      gap: $space-2;
+      flex-wrap: wrap;
+    }
+
+    .profile-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      border-radius: $radius-full;
+      font-size: $font-size-xs;
+      font-weight: 700;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.35);
+      color: $text-light;
+    }
+  }
+
+  .profile-actions {
+    margin-left: auto;
+    z-index: 1;
+  }
+}
+
+// --- Profile Stats -----------------------------------------
+.profile-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $space-4;
+  margin-bottom: $space-6;
+
+  .profile-stat {
+    background: $bg-surface;
+    border-radius: $radius-lg;
+    padding: $space-5;
+    box-shadow: $shadow-card;
+    border: 1px solid $border-subtle;
+    text-align: center;
+    transition: $transition-normal;
+
+    &:hover { transform: translateY(-2px); box-shadow: $shadow-hover; }
+
+    .pstat-value {
+      font-size: $font-size-3xl;
+      font-weight: 800;
+      color: $accent-primary;
+      line-height: 1;
+    }
+
+    .pstat-label {
+      font-size: $font-size-xs;
+      color: $text-muted;
+      margin-top: $space-2;
+      font-weight: 500;
+    }
+
+    .pstat-icon {
+      font-size: 1.5rem;
+      margin-bottom: $space-2;
+    }
+  }
+}
+
+// --- Profile Form ------------------------------------------
+.profile-form-card {
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-card;
+  border: 1px solid $border-subtle;
+  overflow: hidden;
+  margin-bottom: $space-6;
+
+  .card-tabs {
+    display: flex;
+    border-bottom: 2px solid $border-subtle;
+    background: $bg-elevated;
+
+    .card-tab {
+      padding: $space-4 $space-6;
+      font-size: $font-size-sm;
+      font-weight: 600;
+      color: $text-muted;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: $transition-fast;
+      border: none;
+      background: none;
+
+      &.active {
+        color: $accent-primary;
+        border-bottom-color: $accent-primary;
+        background: $bg-surface;
+      }
+
+      &:hover:not(.active) { color: $text-primary; }
+    }
+  }
+
+  .card-tab-content {
+    display: none;
+    padding: $space-8;
+
+    &.active { display: block; animation: fadeIn 0.3s ease; }
+  }
+}
+
+// Color picker for avatar
+.color-picker-grid {
+  display: flex;
+  gap: $space-3;
+  flex-wrap: wrap;
+  margin-top: $space-2;
+
+  .color-option {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: $transition-fast;
+
+    &:hover, &.selected {
+      border-color: $text-primary;
+      transform: scale(1.15);
+    }
+  }
+}
+
+// Gender identity select with color preview
+.gender-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+
+  select { flex: 1; }
+
+  .gender-preview {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid $border-subtle;
+    flex-shrink: 0;
+    transition: background 0.3s ease;
+  }
+}
+
+// --- Activity Timeline -------------------------------------
+.activity-timeline {
+  .timeline-item {
+    display: flex;
+    gap: $space-4;
+    padding: $space-4 0;
+    border-bottom: 1px solid $border-subtle;
+
+    &:last-child { border-bottom: none; }
+
+    .timeline-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: $radius-md;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      color: $text-light;
+      flex-shrink: 0;
+    }
+
+    .timeline-text {
+      flex: 1;
+      .tl-title { font-size: $font-size-sm; font-weight: 600; }
+      .tl-time  { font-size: $font-size-xs; color: $text-muted; margin-top: 2px; }
+    }
+  }
+}
+
+@media (max-width: 700px) {
+  .profile-hero { flex-direction: column; text-align: center; }
+  .profile-stats-row { grid-template-columns: 1fr 1fr; }
+  .profile-info .profile-badges { justify-content: center; }
+}

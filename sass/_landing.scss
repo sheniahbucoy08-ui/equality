@@ -1,0 +1,475 @@
+@use 'variables' as *;
+
+// ============================================================
+// Landing Page (index.php)
+// ============================================================
+
+.landing-page {
+  background: $bg-surface;
+  overflow-x: hidden;
+}
+
+// --- Top Nav -----------------------------------------------
+.landing-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: $space-4 $space-8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: $transition-normal;
+
+  &.scrolled {
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    font-size: $font-size-xl;
+    font-weight: 800;
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: $gradient-primary;
+      border-radius: $radius-md;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: $text-light;
+      font-size: 1.2rem;
+    }
+
+    span {
+      background: $gradient-primary;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  }
+
+  .nav-actions {
+    display: flex;
+    gap: $space-3;
+    align-items: center;
+  }
+}
+
+// --- Hero Section ------------------------------------------
+.hero {
+  min-height: 100vh;
+  background: $gradient-hero;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  padding: 120px $space-8 $space-16;
+
+  &::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(255,255,255,0.1), transparent 60%);
+    top: -100px;
+    right: -100px;
+    border-radius: 50%;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 60%);
+    bottom: -50px;
+    left: 5%;
+    border-radius: 50%;
+  }
+
+  .hero-content {
+    max-width: $container-max;
+    margin: 0 auto;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-12;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero-text {
+    color: $text-light;
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: $space-2;
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: $space-2 $space-4;
+      border-radius: $radius-full;
+      font-size: $font-size-sm;
+      font-weight: 600;
+      margin-bottom: $space-6;
+      color: $text-light;
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 5vw, 3.8rem);
+      font-weight: 900;
+      line-height: 1.1;
+      color: $text-light;
+      margin-bottom: $space-6;
+
+      .highlight {
+        background: linear-gradient(135deg, #ffe66d, #ff6b6b);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+    }
+
+    p {
+      font-size: $font-size-lg;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.8;
+      margin-bottom: $space-8;
+      max-width: 500px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: $space-4;
+      flex-wrap: wrap;
+
+      .btn-hero-primary {
+        background: $text-light;
+        color: $accent-primary;
+        padding: $space-4 $space-8;
+        border-radius: $radius-xl;
+        font-weight: 700;
+        font-size: $font-size-md;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        transition: $transition-normal;
+        text-decoration: none;
+
+        &:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); color: $accent-secondary; }
+      }
+
+      .btn-hero-secondary {
+        background: rgba(255,255,255,0.15);
+        color: $text-light;
+        padding: $space-4 $space-8;
+        border-radius: $radius-xl;
+        font-weight: 700;
+        font-size: $font-size-md;
+        border: 2px solid rgba(255,255,255,0.5);
+        display: inline-flex;
+        align-items: center;
+        gap: $space-2;
+        transition: $transition-normal;
+        text-decoration: none;
+
+        &:hover { background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.8); }
+      }
+    }
+  }
+
+  .hero-visual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+
+    .hero-card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: $radius-lg;
+      padding: $space-5;
+      color: $text-light;
+
+      &:first-child { margin-top: 20px; }
+      &:nth-child(2) { margin-top: -20px; }
+
+      .card-icon {
+        font-size: 2rem;
+        margin-bottom: $space-2;
+      }
+
+      .card-stat {
+        font-size: $font-size-3xl;
+        font-weight: 800;
+      }
+
+      .card-label {
+        font-size: $font-size-xs;
+        opacity: 0.8;
+        margin-top: 4px;
+      }
+    }
+  }
+}
+
+// --- Pride Bar ---------------------------------------------
+.pride-bar {
+  height: 6px;
+  background: $gradient-pride;
+}
+
+// --- Features Section --------------------------------------
+.features-section {
+  padding: $space-16 $space-8;
+  max-width: $container-max;
+  margin: 0 auto;
+
+  .section-tag {
+    text-align: center;
+    font-size: $font-size-sm;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: $accent-primary;
+    margin-bottom: $space-3;
+  }
+
+  h2 {
+    text-align: center;
+    font-size: clamp(1.8rem, 3vw, 2.5rem);
+    font-weight: 800;
+    margin-bottom: $space-4;
+  }
+
+  .section-desc {
+    text-align: center;
+    color: $text-muted;
+    max-width: 560px;
+    margin: 0 auto $space-12;
+    font-size: $font-size-lg;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: $space-6;
+  }
+
+  .feature-card {
+    background: $bg-surface;
+    border-radius: $radius-xl;
+    padding: $space-8;
+    box-shadow: $shadow-card;
+    border: 1px solid $border-subtle;
+    transition: $transition-normal;
+
+    &:hover {
+      transform: translateY(-6px);
+      box-shadow: $shadow-hover;
+    }
+
+    .feature-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: $radius-lg;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: $space-5;
+      color: $text-light;
+    }
+
+    h3 {
+      font-size: $font-size-xl;
+      font-weight: 700;
+      margin-bottom: $space-3;
+    }
+
+    p { color: $text-muted; font-size: $font-size-sm; line-height: 1.7; }
+
+    .feature-link {
+      display: inline-flex;
+      align-items: center;
+      gap: $space-2;
+      color: $accent-primary;
+      font-size: $font-size-sm;
+      font-weight: 600;
+      margin-top: $space-4;
+      transition: $transition-fast;
+
+      &:hover { gap: $space-3; }
+    }
+  }
+}
+
+// --- Stats Banner ------------------------------------------
+.stats-section {
+  background: $gradient-primary;
+  padding: $space-12 $space-8;
+
+  .stats-inner {
+    max-width: $container-max;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: $space-8;
+    text-align: center;
+  }
+
+  .stat-item {
+    color: $text-light;
+
+    .stat-num {
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      font-weight: 900;
+      display: block;
+      line-height: 1;
+    }
+
+    .stat-desc {
+      font-size: $font-size-sm;
+      opacity: 0.85;
+      margin-top: $space-2;
+    }
+  }
+}
+
+// --- Gender Representation Preview -------------------------
+.gender-section {
+  padding: $space-16 $space-8;
+  background: $bg-elevated;
+
+  .gender-inner {
+    max-width: $container-max;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-12;
+    align-items: center;
+  }
+
+  .gender-text {
+    h2 {
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-weight: 800;
+      margin-bottom: $space-4;
+    }
+    p { color: $text-muted; line-height: 1.8; margin-bottom: $space-6; }
+  }
+
+  .gender-legend {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: $space-3;
+      background: $bg-surface;
+      border-radius: $radius-md;
+      padding: $space-3 $space-4;
+      box-shadow: $shadow-card;
+
+      .legend-bar {
+        height: 10px;
+        border-radius: $radius-full;
+        flex: 1;
+        max-width: 140px;
+      }
+
+      .legend-label { font-size: $font-size-sm; font-weight: 600; flex: 1; }
+      .legend-value { font-size: $font-size-sm; font-weight: 700; color: $text-secondary; }
+    }
+  }
+}
+
+// --- CTA Section -------------------------------------------
+.cta-section {
+  padding: $space-16 $space-8;
+  background: $gradient-warm;
+  text-align: center;
+
+  .cta-inner {
+    max-width: 700px;
+    margin: 0 auto;
+    color: $text-light;
+
+    h2 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 900;
+      color: $text-light;
+      margin-bottom: $space-4;
+    }
+
+    p {
+      font-size: $font-size-lg;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: $space-8;
+    }
+  }
+}
+
+// --- Footer ------------------------------------------------
+.landing-footer {
+  background: $bg-dark;
+  color: rgba(255,255,255,0.7);
+  padding: $space-8;
+  text-align: center;
+
+  .footer-inner {
+    max-width: $container-max;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: $space-4;
+  }
+
+  .footer-logo {
+    font-size: $font-size-lg;
+    font-weight: 800;
+    color: $text-light;
+    background: $gradient-primary;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .footer-pride {
+    height: 3px;
+    width: 100%;
+    background: $gradient-pride;
+    border-radius: $radius-full;
+    margin: $space-4 auto 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero .hero-content,
+  .gender-section .gender-inner { grid-template-columns: 1fr; }
+  .hero .hero-visual { display: none; }
+  .stats-section .stats-inner { grid-template-columns: repeat(2, 1fr); }
+  .landing-nav { padding: $space-3 $space-4; }
+}
+
+@media (max-width: 600px) {
+  .stats-section .stats-inner { grid-template-columns: 1fr 1fr; }
+  .hero { padding: 100px $space-4 $space-12; }
+  .features-section,
+  .gender-section,
+  .cta-section { padding: $space-10 $space-4; }
+}

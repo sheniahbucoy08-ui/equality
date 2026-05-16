@@ -1,0 +1,315 @@
+@use 'variables' as *;
+
+// ============================================================
+// Admin Panel (admin.php)
+// ============================================================
+
+.admin-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+// --- Admin Header ------------------------------------------
+.admin-header {
+  background: linear-gradient(135deg, #2d1b69, #4a0072);
+  border-radius: $radius-xl;
+  padding: $space-8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $space-6;
+  color: $text-light;
+
+  .admin-title {
+    h2 {
+      font-size: $font-size-3xl;
+      font-weight: 900;
+      color: $text-light;
+      display: flex;
+      align-items: center;
+      gap: $space-3;
+    }
+    p { color: rgba(255,255,255,0.7); font-size: $font-size-sm; margin-top: $space-2; }
+  }
+
+  .admin-badge {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: $text-light;
+    padding: $space-2 $space-4;
+    border-radius: $radius-full;
+    font-size: $font-size-sm;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+}
+
+// --- Admin Stats Grid --------------------------------------
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $space-4;
+  margin-bottom: $space-6;
+}
+
+// --- Admin Tabs -------------------------------------------
+.admin-tabs-nav {
+  display: flex;
+  gap: $space-2;
+  margin-bottom: $space-6;
+  border-bottom: 2px solid $border-subtle;
+  padding-bottom: 0;
+  overflow-x: auto;
+
+  .admin-tab-btn {
+    padding: $space-3 $space-5;
+    font-size: $font-size-sm;
+    font-weight: 600;
+    color: $text-muted;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    white-space: nowrap;
+    transition: $transition-fast;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    border-radius: $radius-sm $radius-sm 0 0;
+
+    &.active {
+      color: $accent-primary;
+      border-bottom-color: $accent-primary;
+      background: rgba($accent-primary, 0.05);
+    }
+
+    &:hover:not(.active) { color: $text-primary; }
+
+    .tab-count {
+      background: $bg-elevated;
+      color: $text-muted;
+      font-size: $font-size-xs;
+      padding: 1px 7px;
+      border-radius: $radius-full;
+      min-width: 22px;
+      text-align: center;
+    }
+  }
+}
+
+.admin-tab-panel {
+  display: none;
+
+  &.active { display: block; animation: fadeIn 0.3s ease; }
+}
+
+// --- User Management Table ---------------------------------
+.user-table-wrapper {
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-card;
+  border: 1px solid $border-subtle;
+  overflow: hidden;
+
+  .table-toolbar {
+    padding: $space-4 $space-6;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid $border-subtle;
+    background: $bg-elevated;
+
+    .search-box {
+      position: relative;
+
+      i {
+        position: absolute;
+        left: $space-3;
+        top: 50%;
+        transform: translateY(-50%);
+        color: $text-muted;
+        font-size: $font-size-sm;
+      }
+
+      input {
+        padding: $space-2 $space-4 $space-2 2rem;
+        border: 1px solid $border-subtle;
+        border-radius: $radius-md;
+        font-size: $font-size-sm;
+        width: 260px;
+
+        &:focus { border-color: $accent-primary; width: 300px; }
+      }
+    }
+  }
+
+  .user-row {
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: $space-3;
+
+      .user-cell-info {
+        .cell-name { font-weight: 700; font-size: $font-size-sm; }
+        .cell-email { font-size: $font-size-xs; color: $text-muted; }
+      }
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: $space-2;
+    }
+  }
+}
+
+// --- Leadership Editor ------------------------------------
+.leadership-editor {
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-card;
+  border: 1px solid $border-subtle;
+  overflow: hidden;
+
+  .le-header {
+    background: $gradient-primary;
+    padding: $space-5 $space-6;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 { color: $text-light; font-size: $font-size-lg; display: flex; align-items: center; gap: $space-2; }
+  }
+
+  .le-body {
+    padding: $space-6;
+
+    .org-form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: $space-4;
+      margin-bottom: $space-5;
+
+      .gender-field {
+        label {
+          display: flex;
+          align-items: center;
+          gap: $space-2;
+          font-size: $font-size-sm;
+          font-weight: 600;
+          margin-bottom: $space-2;
+
+          .gender-dot { width: 10px; height: 10px; }
+        }
+
+        input[type="number"] {
+          width: 100%;
+          padding: $space-3;
+          border: 2px solid $border-subtle;
+          border-radius: $radius-md;
+          font-size: $font-size-sm;
+          font-weight: 700;
+          color: $text-primary;
+
+          &:focus { outline: none; border-color: $accent-primary; }
+        }
+      }
+    }
+
+    .org-data-table {
+      margin-top: $space-6;
+      border-radius: $radius-md;
+      overflow: hidden;
+      border: 1px solid $border-subtle;
+
+      .org-row {
+        display: grid;
+        grid-template-columns: 2fr repeat(6, 1fr) auto;
+        align-items: center;
+        padding: $space-3 $space-4;
+        border-bottom: 1px solid $border-subtle;
+        font-size: $font-size-xs;
+
+        &:last-child { border-bottom: none; }
+        &.header { background: $bg-elevated; font-weight: 700; color: $text-muted; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .pct-pill {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: $radius-full;
+          font-weight: 700;
+          font-size: 0.7rem;
+          color: $text-light;
+        }
+      }
+    }
+  }
+}
+
+// --- Reports Inbox ----------------------------------------
+.reports-inbox {
+  .report-item {
+    background: $bg-surface;
+    border-radius: $radius-lg;
+    padding: $space-5;
+    box-shadow: $shadow-card;
+    border: 1px solid $border-subtle;
+    border-left: 4px solid $accent-error;
+    margin-bottom: $space-4;
+    transition: $transition-normal;
+
+    &.resolved { border-left-color: $accent-success; opacity: 0.7; }
+    &:hover { box-shadow: $shadow-hover; }
+
+    .report-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: $space-3;
+
+      .report-type {
+        font-weight: 700;
+        font-size: $font-size-sm;
+        color: $text-primary;
+        display: flex;
+        align-items: center;
+        gap: $space-2;
+      }
+
+      .report-meta {
+        font-size: $font-size-xs;
+        color: $text-muted;
+        display: flex;
+        align-items: center;
+        gap: $space-3;
+      }
+    }
+
+    .report-description {
+      font-size: $font-size-sm;
+      color: $text-secondary;
+      line-height: 1.7;
+      margin-bottom: $space-4;
+      padding: $space-3;
+      background: $bg-elevated;
+      border-radius: $radius-md;
+    }
+
+    .report-actions { display: flex; gap: $space-3; }
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-stats { grid-template-columns: repeat(2, 1fr); }
+  .le-body .org-form-grid { grid-template-columns: repeat(2, 1fr); }
+  .org-row { grid-template-columns: 1fr 1fr !important; }
+}
+
+@media (max-width: 600px) {
+  .admin-stats { grid-template-columns: 1fr 1fr; }
+  .user-table-wrapper .table-toolbar { flex-direction: column; gap: $space-3; align-items: flex-start; }
+  .user-table-wrapper .table-toolbar .search-box input { width: 100%; }
+  .admin-header { flex-direction: column; gap: $space-4; }
+}

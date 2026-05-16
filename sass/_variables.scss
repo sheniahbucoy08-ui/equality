@@ -1,0 +1,106 @@
+// ============================================================
+// EqualVoice — SASS Variables (Pastel Pride Palette)
+// ============================================================
+
+// --- Pastel Pride / Gender Identity Colors ------------------
+$color-women:       #ED8E89;   // Coral pink
+$color-men:         #9BD6D9;   // Soft cyan
+$color-nonbinary:   #F3EBA5;   // Soft yellow
+$color-transgender: #F7B685;   // Peach
+$color-gay:         #B4A8E0;   // Lavender
+$color-lesbian:     #94C691;   // Soft green
+$color-bisexual:    #D6A8E0;
+$color-queer:       #F7C685;
+
+// --- Brand Palette ------------------------------------------
+$accent-primary:   #B4A8E0;
+$accent-secondary: #ED8E89;
+$accent-tertiary:  #94C691;
+$accent-success:   #94C691;
+$accent-warning:   #F7B685;
+$accent-error:     #ED8E89;
+$accent-info:      #9BD6D9;
+
+// --- Gradients ----------------------------------------------
+$gradient-primary:  linear-gradient(135deg, #B4A8E0 0%, #ED8E89 100%);
+$gradient-warm:     linear-gradient(135deg, #ED8E89 0%, #F7B685 100%);
+$gradient-cool:     linear-gradient(135deg, #9BD6D9 0%, #B4A8E0 100%);
+$gradient-fresh:    linear-gradient(135deg, #94C691 0%, #9BD6D9 100%);
+$gradient-pride:    linear-gradient(90deg, #ED8E89, #F7B685, #F3EBA5, #94C691, #9BD6D9, #B4A8E0);
+$gradient-hero:     linear-gradient(135deg, #B4A8E0 0%, #9BD6D9 35%, #94C691 70%, #F3EBA5 100%);
+$gradient-sidebar:  linear-gradient(180deg, #6B5BA8 0%, #4A3D7A 100%);
+$gradient-trans:    linear-gradient(135deg, #9BD6D9, #F7B685, #ED8E89);
+
+// --- Surfaces / Backgrounds ---------------------------------
+$bg-body:      #FAF6F2;
+$bg-primary:   #fdfcfa;
+$bg-surface:   #ffffff;
+$bg-elevated:  #F7F2EC;
+$bg-hover:     #F0E8DF;
+$bg-dark:      #3a2f5c;
+
+// --- Text ---------------------------------------------------
+$text-primary:   #2D2640;
+$text-secondary: #5A5170;
+$text-muted:     #8B85A0;
+$text-light:     #ffffff;
+
+// --- Borders ------------------------------------------------
+$border-subtle: #E8DFD3;
+$border-medium: #D4C8B8;
+
+// --- Shadows ------------------------------------------------
+$shadow-card:     0 8px 24px rgba(180, 168, 224, 0.18);
+$shadow-hover:    0 16px 40px rgba(237, 142, 137, 0.25);
+$shadow-dropdown: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+// --- Typography ---------------------------------------------
+$font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+$font-size-xs:  0.75rem;
+$font-size-sm:  0.875rem;
+$font-size-md:  1rem;
+$font-size-lg:  1.125rem;
+$font-size-xl:  1.25rem;
+$font-size-2xl: 1.5rem;
+$font-size-3xl: 1.875rem;
+$font-size-4xl: 2.25rem;
+$font-size-5xl: 3rem;
+
+// --- Spacing ------------------------------------------------
+$space-1: 0.25rem;
+$space-2: 0.5rem;
+$space-3: 0.75rem;
+$space-4: 1rem;
+$space-5: 1.25rem;
+$space-6: 1.5rem;
+$space-8: 2rem;
+$space-10: 2.5rem;
+$space-12: 3rem;
+$space-16: 4rem;
+
+// --- Border Radius ------------------------------------------
+$radius-sm:   8px;
+$radius-md:   12px;
+$radius-lg:   16px;
+$radius-xl:   24px;
+$radius-full: 9999px;
+
+// --- Layout -------------------------------------------------
+$sidebar-width:    260px;
+$topbar-height:    64px;
+$container-max:    1200px;
+
+// --- Transitions --------------------------------------------
+$transition-fast:   all 0.15s ease;
+$transition-normal: all 0.25s ease;
+$transition-slow:   all 0.4s ease;
+
+// --- Gender color map ---------------------------------------
+$gender-colors: (
+  'women':       $color-women,
+  'men':         $color-men,
+  'nonbinary':   $color-nonbinary,
+  'transgender': $color-transgender,
+  'gay':         $color-gay,
+  'lesbian':     $color-lesbian,
+);

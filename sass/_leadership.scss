@@ -1,0 +1,229 @@
+@use 'variables' as *;
+
+// ============================================================
+// Leadership Tracker — Doughnut Chart + Gender Legend
+// ============================================================
+
+.leadership-section {
+  .leadership-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-6;
+    margin-bottom: $space-6;
+  }
+}
+
+// Chart panel
+.chart-panel {
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  padding: $space-8;
+  box-shadow: $shadow-card;
+  border: 1px solid $border-subtle;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  .chart-title {
+    font-size: $font-size-lg;
+    font-weight: 800;
+    margin-bottom: $space-6;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  .chart-container {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    margin-bottom: $space-6;
+  }
+
+  .chart-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+
+    .center-value {
+      font-size: $font-size-3xl;
+      font-weight: 900;
+      color: $text-primary;
+      line-height: 1;
+    }
+
+    .center-label {
+      font-size: $font-size-xs;
+      color: $text-muted;
+      margin-top: 4px;
+    }
+  }
+}
+
+// Gender Legend
+.gender-legend {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    border-radius: $radius-md;
+    border: 1px solid $border-subtle;
+    background: $bg-surface;
+    transition: $transition-fast;
+
+    &:hover { background: $bg-hover; }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .legend-name {
+      flex: 1;
+      font-size: $font-size-sm;
+      font-weight: 600;
+      color: $text-primary;
+    }
+
+    .legend-pct {
+      font-size: $font-size-sm;
+      font-weight: 800;
+      color: $text-secondary;
+      min-width: 44px;
+      text-align: right;
+    }
+
+    .legend-bar-wrap {
+      width: 80px;
+      height: 6px;
+      background: $bg-elevated;
+      border-radius: $radius-full;
+      overflow: hidden;
+
+      .legend-bar-fill {
+        height: 100%;
+        border-radius: $radius-full;
+        transition: width 0.8s ease;
+      }
+    }
+  }
+}
+
+// Pride color classes for legend
+.legend-women       { .legend-color { background: $color-women; }       .legend-bar-fill { background: $color-women; } }
+.legend-men         { .legend-color { background: $color-men; }         .legend-bar-fill { background: $color-men; } }
+.legend-nonbinary   { .legend-color { background: $color-nonbinary; }   .legend-bar-fill { background: $color-nonbinary; } }
+.legend-transgender { .legend-color { background: $color-transgender; } .legend-bar-fill { background: $gradient-trans; } }
+.legend-gay         { .legend-color { background: $color-gay; }         .legend-bar-fill { background: $color-gay; } }
+.legend-lesbian     { .legend-color { background: $color-lesbian; }     .legend-bar-fill { background: $color-lesbian; } }
+
+// Org selector
+.org-selector {
+  background: $bg-surface;
+  border-radius: $radius-xl;
+  padding: $space-6;
+  box-shadow: $shadow-card;
+  border: 1px solid $border-subtle;
+
+  h4 { font-size: $font-size-lg; font-weight: 700; margin-bottom: $space-4; }
+
+  .org-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+
+    .org-item {
+      display: flex;
+      align-items: center;
+      gap: $space-3;
+      padding: $space-3 $space-4;
+      border-radius: $radius-md;
+      cursor: pointer;
+      transition: $transition-fast;
+      border: 2px solid transparent;
+      font-size: $font-size-sm;
+
+      &:hover { background: $bg-elevated; }
+      &.active { border-color: $accent-primary; background: rgba($accent-primary, 0.06); color: $accent-primary; font-weight: 700; }
+
+      .org-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: $radius-sm;
+        background: $gradient-primary;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: $text-light;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+      }
+    }
+  }
+}
+
+// Summary stats row
+.leadership-stats-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: $space-3;
+  margin-bottom: $space-6;
+
+  .gender-stat-card {
+    border-radius: $radius-lg;
+    padding: $space-4 $space-3;
+    text-align: center;
+    color: $text-light;
+    position: relative;
+    overflow: hidden;
+
+    .stat-pct {
+      font-size: $font-size-2xl;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .stat-name {
+      font-size: $font-size-xs;
+      opacity: 0.9;
+      margin-top: 4px;
+    }
+
+    .stat-flag {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 1rem;
+      opacity: 0.5;
+    }
+  }
+}
+
+// Gender-specific card backgrounds
+.gender-card-women       { background: linear-gradient(135deg, $color-women, darken($color-women, 12%)); }
+.gender-card-men         { background: linear-gradient(135deg, $color-men, darken($color-men, 12%)); }
+.gender-card-nonbinary   { background: linear-gradient(135deg, $color-nonbinary, darken($color-nonbinary, 15%)); color: $text-primary !important; .stat-name { opacity: 0.7; } }
+.gender-card-transgender { background: $gradient-trans; }
+.gender-card-gay         { background: linear-gradient(135deg, $color-gay, darken($color-gay, 12%)); }
+.gender-card-lesbian     { background: linear-gradient(135deg, $color-lesbian, darken($color-lesbian, 12%)); }
+
+@media (max-width: 900px) {
+  .leadership-section .leadership-grid { grid-template-columns: 1fr; }
+  .leadership-stats-row { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .leadership-stats-row { grid-template-columns: repeat(2, 1fr); }
+}
