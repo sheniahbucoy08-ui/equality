@@ -1,23 +1,34 @@
+# Version control
 .git
 .gitignore
+.github
+
+# Editor / OS
 .vscode
 .DS_Store
-node_modules
-npm-debug.log
-*.pem
-*.key
-.env.local
-.env.*.local
-Thumbs.db
-*.swp
-*.swo
-*~
 .idea
 .project
 .settings
 *.iml
-*.log
-.gradle
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Secrets - never copy into image
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Node
+node_modules
+npm-debug.log
+package-lock.json
+yarn.lock
+
+# Build artifacts
 build/
 dist/
 coverage/
@@ -27,19 +38,16 @@ coverage/
 tmp/
 temp/
 
-# Docker files (prevent recursion)
-Dockerfile
-docker-compose.yml
-.dockerignore
-docker/
+# Logs
+*.log
 
-# CI/CD
+# CI/CD docs (not needed at runtime)
 Jenkinsfile
 .github/
 .gitlab-ci.yml
 .travis.yml
-
-# Documentation
+DOCKER_JENKINS_GUIDE.md
+DOCKER_JENKINS_SETUP_COMPLETE.md
 README.md
 CONTRIBUTING.md
 LICENSE
@@ -50,7 +58,7 @@ test/
 *.test.php
 phpunit.xml
 
-# Node (if any)
-package.json
-package-lock.json
-yarn.lock
+# NOTE: docker/ and docker-compose.yml are intentionally NOT excluded here.
+# The Dockerfile uses explicit COPY docker/xxx instructions which Docker
+# resolves before .dockerignore filtering; keeping them in context avoids
+# "not found" cache-key errors during cloud builds.

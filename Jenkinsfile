@@ -5,220 +5,256 @@ pipeline {
         timestamps()
         timeout(time: 1, unit: 'HOURS')
         disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
     environment {
-        REGISTRY = 'docker.io'
-        IMAGE_NAME = 'equalvoice'
-        IMAGE_TAG = "${BUILD_NUMBER}_${GIT_COMMIT.take(7)}"
-        DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
-        DB_NAME = 'equalvoice_db'
-        DB_USER = 'equalvoice_user'
-        DB_PASS = credentials('db-password')
+        REGISTRY        = 'docker.io'
+        IMAGE_NAME      = 'equalvoice'
+        // Tag = buildNumber_shortCommit  (GIT_COMMIT available after checkout)
+        DOCKER_CREDS    = credentials('docker-hub-credentials')
+        DB_NAME         = 'equalvoice_db'
+        DB_USER         = 'equalvoice_user'
+        DB_PASS         = credentials('db-password')
+        DB_ROOT_PASSWORD = credentials('db-root-password')
+        COMPOSE_FILE    = 'docker-compose.yml'
     }
 
     stages {
+
+        // ── 1. Checkout ────────────────────────────────────────────────────────
         stage('Checkout') {
             steps {
+                checkout scm
                 script {
-                    echo '========== Checking out code =========='
-                    checkout scm
-                    sh 'git log --oneline -1'
+                    env.GIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.IMAGE_TAG = "${BUILD_NUMBER}_${env.GIT_SHORT}"
+                    echo "Building image tag: ${env.IMAGE_TAG}"
+                    sh 'git log --oneline -5'
                 }
             }
         }
 
+        // ── 2. Create .env for compose ─────────────────────────────────────────
         stage('Environment Setup') {
             steps {
                 script {
-                    echo '========== Setting up environment =========='
-                    sh '''
-                        echo "DB_NAME=${DB_NAME}" > .env
-                        echo "DB_USER=${DB_USER}" >> .env
-                        echo "DB_PASS=${DB_PASS}" >> .env
-                        echo "DB_ROOT_PASSWORD=root_jenkins_secure" >> .env
-                    '''
-                    sh 'cat .env | grep -v "PASS" || echo "Environment configured"'
+                    // Write .env without printing passwords to the log
+                    writeFile file: '.env', text: """DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASS=${DB_PASS}
+DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+BUILD_DATE=${sh(script:'date -u +%Y-%m-%dT%H:%M:%SZ', returnStdout: true).trim()}
+VCS_REF=${GIT_COMMIT}
+BUILD_VERSION=${BUILD_NUMBER}
+"""
+                    sh 'echo "Environment file created (passwords redacted)"'
+                    sh 'grep -v "PASS\\|PASSWORD" .env || true'
                 }
             }
         }
 
+        // ── 3. PHP syntax check ────────────────────────────────────────────────
         stage('Code Quality') {
             steps {
-                script {
-                    echo '========== Running code quality checks =========='
-                    sh '''
-                        # Check PHP syntax
-                        find . -name "*.php" -type f ! -path "./vendor/*" ! -path "./.git/*" -exec php -l {} \\; | grep -i "parse error" && exit 1 || echo "✓ PHP syntax check passed"
-                    '''
-                }
+                sh '''
+                    echo "Running PHP syntax check..."
+                    ERRORS=0
+                    while IFS= read -r file; do
+                        if ! php -l "$file" > /dev/null 2>&1; then
+                            echo "SYNTAX ERROR: $file"
+                            php -l "$file"
+                            ERRORS=$((ERRORS + 1))
+                        fi
+                    done < <(find . -name "*.php" -type f \
+                               ! -path "./.git/*" \
+                               ! -path "./vendor/*")
+                    if [ "$ERRORS" -gt 0 ]; then
+                        echo "Found $ERRORS PHP syntax error(s). Aborting."
+                        exit 1
+                    fi
+                    echo "PHP syntax check passed."
+                '''
             }
         }
 
+        // ── 4. Build Docker image ──────────────────────────────────────────────
         stage('Build Docker Image') {
             steps {
-                script {
-                    echo '========== Building Docker image =========='
-                    sh '''
-                        docker build \
-                            --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
-                            --build-arg VCS_REF=${GIT_COMMIT} \
-                            --build-arg BUILD_VERSION=${BUILD_NUMBER} \
-                            -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
-                            -t ${REGISTRY}/${IMAGE_NAME}:latest \
-                            .
-                        docker images | grep ${IMAGE_NAME}
-                    '''
-                }
+                sh '''
+                    docker build \
+                        --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                        --build-arg VCS_REF="${GIT_COMMIT}" \
+                        --build-arg BUILD_VERSION="${BUILD_NUMBER}" \
+                        -t "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" \
+                        -t "${REGISTRY}/${IMAGE_NAME}:latest" \
+                        .
+                    echo "Built images:"
+                    docker images | grep "${IMAGE_NAME}"
+                '''
             }
         }
 
+        // ── 5. Integration test ────────────────────────────────────────────────
         stage('Test Docker Image') {
             steps {
-                script {
-                    echo '========== Testing Docker image =========='
-                    sh '''
-                        # Start containers
-                        docker-compose -f docker-compose.yml up -d --no-build
-                        
-                        # Wait for services to be ready
-                        echo "Waiting for services to be healthy..."
-                        sleep 15
-                        
-                        # Test web service
-                        docker-compose exec -T web curl -f http://localhost/index.php || exit 1
-                        
-                        # Test database connection
-                        docker-compose exec -T mysql mysqladmin ping -u root -proot_jenkins_secure || exit 1
-                        
-                        echo "✓ All services are healthy"
-                    '''
+                sh '''
+                    # Bring up the full stack using the built image
+                    docker-compose -f "${COMPOSE_FILE}" up -d
+
+                    echo "Waiting for services to become healthy..."
+                    TIMEOUT=90
+                    ELAPSED=0
+                    until docker-compose -f "${COMPOSE_FILE}" ps | grep -q "healthy"; do
+                        sleep 5
+                        ELAPSED=$((ELAPSED + 5))
+                        if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+                            echo "Services did not become healthy within ${TIMEOUT}s"
+                            docker-compose -f "${COMPOSE_FILE}" logs
+                            exit 1
+                        fi
+                    done
+                    echo "All services healthy."
+
+                    # Smoke-test the web container
+                    docker-compose -f "${COMPOSE_FILE}" exec -T web \
+                        curl -sf http://localhost/index.php -o /dev/null -w "HTTP %{http_code}"
+
+                    # Verify MySQL is reachable
+                    docker-compose -f "${COMPOSE_FILE}" exec -T mysql \
+                        mysqladmin ping -u root --password="${DB_ROOT_PASSWORD}" --silent
+
+                    echo "Integration tests passed."
+                '''
+            }
+            post {
+                always {
+                    // Tear down test stack regardless of result
+                    sh 'docker-compose -f "${COMPOSE_FILE}" down --volumes || true'
                 }
             }
         }
 
+        // ── 6. Security scan ───────────────────────────────────────────────────
         stage('Security Scan') {
             steps {
-                script {
-                    echo '========== Running security checks =========='
-                    sh '''
-                        # Check for hardcoded credentials
-                        ! grep -r "password.*=.*['\\\"]" --include="*.php" . 2>/dev/null | grep -v "DB_PASS" | head -1 || echo "⚠ Warning: Check hardcoded values"
-                        
-                        # Check for dangerous functions
-                        ! grep -r "eval\|exec\|passthru\|system\|shell_exec" --include="*.php" . 2>/dev/null | head -5 || echo "✓ No dangerous functions found"
-                        
-                        echo "✓ Security scan completed"
-                    '''
-                }
+                sh '''
+                    echo "Checking for dangerous PHP functions..."
+                    DANGEROUS=$(grep -rn "eval\|passthru\|shell_exec\|system\|proc_open\|popen" \
+                                    --include="*.php" . \
+                                    --exclude-path="./.git" 2>/dev/null || true)
+                    if [ -n "$DANGEROUS" ]; then
+                        echo "WARNING - potentially dangerous functions found:"
+                        echo "$DANGEROUS"
+                    else
+                        echo "No dangerous functions found."
+                    fi
+
+                    echo "Checking for hardcoded credentials..."
+                    CREDS=$(grep -rn "password\s*=\s*['\"][^$]" \
+                               --include="*.php" . \
+                               --exclude-path="./.git" 2>/dev/null || true)
+                    if [ -n "$CREDS" ]; then
+                        echo "WARNING - possible hardcoded credentials:"
+                        echo "$CREDS"
+                    else
+                        echo "No hardcoded credentials detected."
+                    fi
+
+                    echo "Security scan complete."
+                '''
             }
         }
 
+        // ── 7. Push to registry (main branch only) ─────────────────────────────
         stage('Push Image') {
-            when {
-                branch 'main'
-            }
+            when { branch 'main' }
             steps {
-                script {
-                    echo '========== Pushing image to registry =========='
-                    sh '''
-                        echo "${DOCKER_CREDENTIALS_PSW}" | docker login -u "${DOCKER_CREDENTIALS_USR}" --password-stdin
-                        docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
-                        docker logout
-                        echo "✓ Image pushed successfully"
-                    '''
-                }
+                sh '''
+                    echo "${DOCKER_CREDS_PSW}" | \
+                        docker login -u "${DOCKER_CREDS_USR}" --password-stdin "${REGISTRY}"
+
+                    docker push "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                    docker push "${REGISTRY}/${IMAGE_NAME}:latest"
+
+                    docker logout "${REGISTRY}"
+                    echo "Image pushed: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                '''
             }
         }
 
+        // ── 8. Deploy (main branch only) ───────────────────────────────────────
         stage('Deploy') {
-            when {
-                branch 'main'
-            }
+            when { branch 'main' }
             steps {
-                script {
-                    echo '========== Deploying application =========='
-                    sh '''
-                        # Pull latest images
-                        docker-compose pull
-                        
-                        # Stop existing containers
-                        docker-compose down || true
-                        
-                        # Start new containers
-                        docker-compose up -d
-                        
-                        # Run database migrations if needed
-                        docker-compose exec -T web php /var/www/html/setup.php || echo "Setup already completed"
-                        
-                        # Health check
-                        sleep 10
-                        docker-compose ps
-                        echo "✓ Deployment completed successfully"
-                    '''
-                }
+                sh '''
+                    # Update images and redeploy
+                    docker-compose -f "${COMPOSE_FILE}" pull
+                    docker-compose -f "${COMPOSE_FILE}" up -d --remove-orphans
+
+                    # Wait for healthy state before running setup
+                    sleep 20
+                    docker-compose -f "${COMPOSE_FILE}" ps
+
+                    # One-time setup (idempotent)
+                    docker-compose -f "${COMPOSE_FILE}" exec -T web \
+                        php /var/www/html/setup.php || echo "Setup already completed or not required."
+
+                    echo "Deployment complete."
+                '''
             }
         }
 
+        // ── 9. Post-deployment smoke tests (main branch only) ──────────────────
         stage('Post-Deployment Tests') {
-            when {
-                branch 'main'
-            }
+            when { branch 'main' }
             steps {
-                script {
-                    echo '========== Running post-deployment tests =========='
-                    sh '''
-                        # Test API endpoints
-                        curl -s http://localhost/api/admin_analytics.php || echo "⚠ Admin API not accessible"
-                        
-                        # Test main pages
-                        for page in index.php login.php profile.php; do
-                            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/$page)
-                            if [ "$status" != "200" ]; then
-                                echo "⚠ Warning: $page returned HTTP $status"
-                            fi
-                        done
-                        
-                        echo "✓ Post-deployment tests completed"
-                    '''
-                }
+                sh '''
+                    echo "Running post-deployment smoke tests..."
+                    ALL_PASS=true
+                    for page in index.php login.php; do
+                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/$page)
+                        if [ "$STATUS" != "200" ] && [ "$STATUS" != "302" ]; then
+                            echo "WARN: $page returned HTTP $STATUS"
+                            ALL_PASS=false
+                        else
+                            echo "OK:   $page returned HTTP $STATUS"
+                        fi
+                    done
+                    if [ "$ALL_PASS" = "false" ]; then
+                        echo "One or more pages returned unexpected status codes."
+                        exit 1
+                    fi
+                    echo "Post-deployment tests passed."
+                '''
             }
         }
     }
 
     post {
         always {
-            script {
-                echo '========== Cleanup =========='
-                sh '''
-                    # Remove .env file
-                    rm -f .env
-                    
-                    # Cleanup docker
-                    docker system prune -f --volumes || true
-                '''
-            }
+            sh '''
+                # Remove .env (contains secrets)
+                rm -f .env
+
+                # Prune dangling images / stopped containers — preserve volumes
+                docker system prune -f || true
+            '''
         }
         success {
-            script {
-                echo '========== Build Successful =========='
-                // Notify on success - add your notification here
-                sh 'echo "✓ Pipeline completed successfully"'
-            }
+            echo "Pipeline completed successfully - Build ${BUILD_NUMBER} (${env.IMAGE_TAG})"
         }
         failure {
-            script {
-                echo '========== Build Failed =========='
-                sh '''
-                    docker-compose logs || true
-                    docker logs equalvoice_web 2>&1 | tail -50 || true
-                    docker logs equalvoice_mysql 2>&1 | tail -50 || true
-                '''
-                // Notify on failure - add your notification here
-            }
+            sh '''
+                echo "===== BUILD FAILED — collecting logs ====="
+                docker-compose -f "${COMPOSE_FILE}" logs --no-color 2>&1 | tail -100 || true
+            '''
+            // Uncomment and configure to add Slack / email notifications:
+            // slackSend channel: '#deployments', color: 'danger',
+            //           message: "FAILED: ${JOB_NAME} #${BUILD_NUMBER}"
         }
         cleanup {
+            // Always clean the workspace so credentials are not left on disk
             deleteDir()
         }
     }

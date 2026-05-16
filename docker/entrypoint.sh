@@ -1,47 +1,53 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting EqualVoice Application..."
+echo "=========================================="
+echo "  Starting EqualVoice Application"
+echo "=========================================="
 
-# Wait for MySQL to be ready
-echo "⏳ Waiting for MySQL to be ready..."
+# ── Wait for MySQL ──────────────────────────────────────────────────────────────
+echo "[1/4] Waiting for MySQL to be ready..."
 COUNTER=0
-while ! mysqladmin ping -h"mysql" -u"${DB_USER}" -p"${DB_PASS}" --silent 2>/dev/null; do
-    COUNTER=$((COUNTER+1))
-    if [ $COUNTER -gt 30 ]; then
-        echo "❌ MySQL did not start in time"
+MAX_WAIT=60
+until mysqladmin ping -h"${DB_HOST:-mysql}" -u"${DB_USER}" -p"${DB_PASS}" --silent 2>/dev/null; do
+    COUNTER=$((COUNTER + 1))
+    if [ "$COUNTER" -ge "$MAX_WAIT" ]; then
+        echo "ERROR: MySQL did not become ready within ${MAX_WAIT} seconds. Aborting."
         exit 1
     fi
-    sleep 1
+    echo "  Attempt $COUNTER/$MAX_WAIT - MySQL not ready yet, retrying..."
+    sleep 2
 done
-echo "✓ MySQL is ready"
+echo "  MySQL is ready."
 
-# Check if database exists
-echo "📦 Checking database..."
-mysql -h"mysql" -u"${DB_USER}" -p"${DB_PASS}" -e "USE ${DB_NAME};" 2>/dev/null || {
-    echo "📁 Creating database..."
-    mysql -h"mysql" -u"root" -p"${DB_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
-    mysql -h"mysql" -u"root" -p"${DB_ROOT_PASSWORD}" -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}'; FLUSH PRIVILEGES;"
-    
-    # Import database schema if it exists
+# ── Bootstrap database ──────────────────────────────────────────────────────────
+echo "[2/4] Checking database..."
+if ! mysql -h"${DB_HOST:-mysql}" -u"${DB_USER}" -p"${DB_PASS}" -e "USE ${DB_NAME};" 2>/dev/null; then
+    echo "  Database '${DB_NAME}' not found — creating..."
+    mysql -h"${DB_HOST:-mysql}" -u"root" -p"${DB_ROOT_PASSWORD}" <<SQL
+CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;
+CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
+GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'%';
+FLUSH PRIVILEGES;
+SQL
+
     if [ -f "/var/www/html/sql/equalvoice.sql" ]; then
-        echo "📥 Importing database schema..."
-        mysql -h"mysql" -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < /var/www/html/sql/equalvoice.sql
-        echo "✓ Database schema imported"
+        echo "  Importing schema from sql/equalvoice.sql..."
+        mysql -h"${DB_HOST:-mysql}" -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" \
+            < /var/www/html/sql/equalvoice.sql
+        echo "  Schema imported successfully."
     fi
-}
+else
+    echo "  Database '${DB_NAME}' already exists — skipping import."
+fi
 
-echo "✓ Database check completed"
-
-# Set proper permissions
-echo "🔐 Setting file permissions..."
+# ── File permissions ────────────────────────────────────────────────────────────
+echo "[3/4] Setting file permissions..."
 chown -R www-data:www-data /var/www/html
 find /var/www/html -type d -exec chmod 755 {} \;
 find /var/www/html -type f -exec chmod 644 {} \;
-chmod 755 /var/www/html
+echo "  Permissions set."
 
-echo "✓ File permissions set"
-
-# Start Apache
-echo "🌐 Starting Apache web server..."
+# ── Start Apache ────────────────────────────────────────────────────────────────
+echo "[4/4] Starting Apache web server..."
 exec apache2-foreground

@@ -1,50 +1,52 @@
 version: '3.8'
 
 services:
-  # MySQL Database
+
+  # ── MySQL 8.0 ────────────────────────────────────────────────────────────────
   mysql:
     image: mysql:8.0
     container_name: equalvoice_mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_123}
-      MYSQL_DATABASE: ${DB_NAME:-equalvoice_db}
-      MYSQL_USER: ${DB_USER:-equalvoice_user}
-      MYSQL_PASSWORD: ${DB_PASS:-user_password_456}
-      MYSQL_ROOT_HOST: '%'
+      MYSQL_DATABASE:      ${DB_NAME:-equalvoice_db}
+      MYSQL_USER:          ${DB_USER:-equalvoice_user}
+      MYSQL_PASSWORD:      ${DB_PASS:-user_password_456}
+      MYSQL_ROOT_HOST:     '%'
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./sql:/docker-entrypoint-initdb.d
+      - ./sql:/docker-entrypoint-initdb.d:ro
     networks:
       - equalvoice_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root_password_123}"]
-      timeout: 20s
-      retries: 10
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost",
+             "-u", "root", "--password=${DB_ROOT_PASSWORD:-root_password_123}"]
       interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  # PHP Apache Web Server
+  # ── PHP / Apache web server ───────────────────────────────────────────────────
   web:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        VCS_REF:    ${VCS_REF:-unknown}
+        BUILD_VERSION: ${BUILD_VERSION:-dev}
     container_name: equalvoice_web
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     environment:
-      - DB_HOST=mysql
-      - DB_NAME=${DB_NAME:-equalvoice_db}
-      - DB_USER=${DB_USER:-equalvoice_user}
-      - DB_PASS=${DB_PASS:-user_password_456}
-    volumes:
-      - ./:/var/www/html
-      - ./docker/php.ini:/usr/local/etc/php/conf.d/custom.ini
-      - ./docker/apache.conf:/etc/apache2/sites-available/000-default.conf
-      - apache_logs:/var/log/apache2
+      DB_HOST:          mysql
+      DB_NAME:          ${DB_NAME:-equalvoice_db}
+      DB_USER:          ${DB_USER:-equalvoice_user}
+      DB_PASS:          ${DB_PASS:-user_password_456}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_123}
     depends_on:
       mysql:
         condition: service_healthy
@@ -57,7 +59,7 @@ services:
       retries: 3
       start_period: 40s
 
-  # phpMyAdmin for database management
+  # ── phpMyAdmin ────────────────────────────────────────────────────────────────
   phpmyadmin:
     image: phpmyadmin:latest
     container_name: equalvoice_phpmyadmin
@@ -65,19 +67,18 @@ services:
     ports:
       - "8080:80"
     environment:
-      PMA_HOST: mysql
-      PMA_USER: ${DB_USER:-equalvoice_user}
-      PMA_PASSWORD: ${DB_PASS:-user_password_456}
-      PMA_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_123}
+      PMA_HOST:          mysql
+      PMA_USER:          ${DB_USER:-equalvoice_user}
+      PMA_PASSWORD:      ${DB_PASS:-user_password_456}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_123}
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     networks:
       - equalvoice_network
 
 volumes:
   mysql_data:
-    driver: local
-  apache_logs:
     driver: local
 
 networks:
