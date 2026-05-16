@@ -1,9 +1,11 @@
 <?php
 // Database configuration — adjust if your XAMPP MySQL password is set
-define('DB_HOST',    'localhost');
-define('DB_NAME',    'equalvoice_db');
-define('DB_USER',    'root');
-define('DB_PASS',    '');
+// Supports both XAMPP local development and Docker containerized environments
+
+define('DB_HOST',    getenv('DB_HOST') ?: 'localhost');
+define('DB_NAME',    getenv('DB_NAME') ?: 'equalvoice_db');
+define('DB_USER',    getenv('DB_USER') ?: 'root');
+define('DB_PASS',    getenv('DB_PASS') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
 function getPDO(): PDO {

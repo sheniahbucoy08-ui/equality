@@ -1,0 +1,56 @@
+.git
+.gitignore
+.vscode
+.DS_Store
+node_modules
+npm-debug.log
+*.pem
+*.key
+.env.local
+.env.*.local
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea
+.project
+.settings
+*.iml
+*.log
+.gradle
+build/
+dist/
+coverage/
+.nyc_output/
+.cache/
+.eslintcache
+tmp/
+temp/
+
+# Docker files (prevent recursion)
+Dockerfile
+docker-compose.yml
+.dockerignore
+docker/
+
+# CI/CD
+Jenkinsfile
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation
+README.md
+CONTRIBUTING.md
+LICENSE
+
+# Test files
+tests/
+test/
+*.test.php
+phpunit.xml
+
+# Node (if any)
+package.json
+package-lock.json
+yarn.lock
