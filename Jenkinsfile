@@ -235,29 +235,28 @@ BUILD_VERSION=${BUILD_NUMBER}
 
     post {
         always {
-            sh '''
-                # Remove .env (contains secrets)
-                rm -f .env
-
-                # Prune dangling images / stopped containers — preserve volumes
-                docker system prune -f || true
-            '''
+            node('') {
+                sh '''
+                    rm -f .env || true
+                    docker system prune -f || true
+                '''
+            }
         }
         success {
-            echo "Pipeline completed successfully - Build ${BUILD_NUMBER} (${env.IMAGE_TAG})"
+            echo "Pipeline completed successfully - Build ${BUILD_NUMBER}"
         }
         failure {
-            sh '''
-                echo "===== BUILD FAILED — collecting logs ====="
-                docker-compose -f "${COMPOSE_FILE}" logs --no-color 2>&1 | tail -100 || true
-            '''
-            // Uncomment and configure to add Slack / email notifications:
-            // slackSend channel: '#deployments', color: 'danger',
-            //           message: "FAILED: ${JOB_NAME} #${BUILD_NUMBER}"
+            node('') {
+                sh '''
+                    echo "===== BUILD FAILED - collecting logs ====="
+                    docker-compose -f docker-compose.yml logs --no-color 2>&1 | tail -100 || true
+                '''
+            }
         }
         cleanup {
-            // Always clean the workspace so credentials are not left on disk
-            deleteDir()
+            node('') {
+                deleteDir()
+            }
         }
     }
 }
