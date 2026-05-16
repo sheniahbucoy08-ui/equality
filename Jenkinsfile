@@ -140,9 +140,10 @@ BUILD_VERSION=${BUILD_NUMBER}
             steps {
                 sh '''
                     echo "Checking for dangerous PHP functions..."
-                    DANGEROUS=$(grep -rn "eval\|passthru\|shell_exec\|system\|proc_open\|popen" \
-                                    --include="*.php" . \
-                                    --exclude-path="./.git" 2>/dev/null || true)
+                    DANGEROUS=$(grep -rn -E "eval|passthru|shell_exec|proc_open|popen" \
+                                    --include="*.php" \
+                                    --exclude-dir=".git" \
+                                    . 2>/dev/null || true)
                     if [ -n "$DANGEROUS" ]; then
                         echo "WARNING - potentially dangerous functions found:"
                         echo "$DANGEROUS"
@@ -151,9 +152,10 @@ BUILD_VERSION=${BUILD_NUMBER}
                     fi
 
                     echo "Checking for hardcoded credentials..."
-                    CREDS=$(grep -rn "password\s*=\s*['\"][^$]" \
-                               --include="*.php" . \
-                               --exclude-path="./.git" 2>/dev/null || true)
+                    CREDS=$(grep -rn -E "password[[:space:]]*=[[:space:]]*['\"][^$]" \
+                                --include="*.php" \
+                                --exclude-dir=".git" \
+                                . 2>/dev/null || true)
                     if [ -n "$CREDS" ]; then
                         echo "WARNING - possible hardcoded credentials:"
                         echo "$CREDS"
