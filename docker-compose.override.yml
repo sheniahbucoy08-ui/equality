@@ -1,0 +1,31 @@
+# docker-compose.override.yml — LOCAL DEVELOPMENT ONLY
+#
+# This file is automatically merged on top of docker-compose.yml when you run
+# `docker compose up` from this directory. It is NOT loaded when an explicit
+# `-f docker-compose.yml` flag is used (which is exactly what the Jenkins
+# pipeline does), so it has zero effect on CI.
+#
+# The only purpose of this file is to pin host ports so that you can always
+# open the app at the SAME URL after `docker compose up -d`:
+#
+#   App        → http://localhost:8000/
+#   phpMyAdmin → http://localhost:8081/
+#   MySQL CLI  → mysql -h 127.0.0.1 -P 3307 -u equalvoice_user -p
+#
+# Port choices and why they don't collide:
+#   8000  → XAMPP Apache already owns 80, so we use 8000 instead
+#   8081  → Jenkins already owns 8080, so we use 8081 instead
+#   3307  → XAMPP MySQL already owns 3306, so we use 3307 instead
+
+services:
+  web:
+    ports:
+      - "8000:80"
+
+  phpmyadmin:
+    ports:
+      - "8081:80"
+
+  mysql:
+    ports:
+      - "3307:3306"

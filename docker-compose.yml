@@ -11,6 +11,10 @@ services:
       MYSQL_USER:          ${DB_USER:-equalvoice_user}
       MYSQL_PASSWORD:      ${DB_PASS:-user_password_456}
       MYSQL_ROOT_HOST:     '%'
+    # No fixed host port → Docker assigns a random free port. This is what CI
+    # needs so concurrent builds don't clash. For predictable local dev ports
+    # use docker-compose.override.yml (auto-applied when you run `docker compose
+    # up` without -f).
     ports:
       - "3306"
     volumes:
@@ -42,6 +46,8 @@ services:
         BUILD_VERSION: ${BUILD_VERSION:-dev}
     # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
     restart: unless-stopped
+    # Random host port in CI; see docker-compose.override.yml for the fixed
+    # local-dev mapping (8000 -> container 80).
     ports:
       - "80"
     environment:
@@ -71,8 +77,11 @@ services:
     image: phpmyadmin:latest
     # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
     restart: unless-stopped
+    # Random host port in CI; see docker-compose.override.yml for the fixed
+    # local-dev mapping (8081 -> container 80) which avoids clashing with
+    # Jenkins on host port 8080.
     ports:
-      - "8080"
+      - "80"
     environment:
       PMA_HOST:          mysql
       PMA_USER:          ${DB_USER:-equalvoice_user}
