@@ -53,11 +53,11 @@ services:
     networks:
       - equalvoice_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/index.php"]
-      interval: 30s
+      test: ["CMD", "curl", "-sf", "http://localhost/index.php"]
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 6
+      start_period: 20s
 
   # ── phpMyAdmin ────────────────────────────────────────────────────────────────
   phpmyadmin:

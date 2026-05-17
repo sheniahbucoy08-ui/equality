@@ -9,14 +9,15 @@ pipeline {
     }
 
     environment {
-        REGISTRY             = 'docker.io'
-        IMAGE_NAME           = 'equalvoice'
-        DB_NAME              = 'equalvoice_db'
-        DB_USER              = 'equalvoice_user'
-        COMPOSE_FILE         = 'docker-compose.yml'
-        DOCKER_HOST          = 'unix:///var/run/docker.sock'
-        // Per-build project name: containers get unique names → no "already in use" error
-        COMPOSE_PROJECT_NAME = "equalvoice_b${BUILD_NUMBER}"
+        REGISTRY        = 'docker.io'
+        IMAGE_NAME      = 'equalvoice'
+        // Tag = buildNumber_shortCommit  (GIT_COMMIT available after checkout)
+        DOCKER_CREDS    = credentials('docker-hub-credentials')
+        DB_NAME         = 'equalvoice_db'
+        DB_USER         = 'equalvoice_user'
+        DB_PASS         = credentials('db-password')
+        DB_ROOT_PASSWORD = credentials('db-root-password')
+        COMPOSE_FILE    = 'docker-compose.yml'
     }
 
     stages {
@@ -34,54 +35,30 @@ pipeline {
             }
         }
 
-        // ── 2. Pre-flight cleanup ──────────────────────────────────────────────
-        stage('Pre-flight Cleanup') {
-            steps {
-                sh '''
-                    # Force-remove any containers from a previous failed run
-                    for name in equalvoice_mysql equalvoice_web equalvoice_phpmyadmin; do
-                        if docker inspect "$name" > /dev/null 2>&1; then
-                            echo "Removing stale container: $name"
-                            docker rm -f "$name" || true
-                        fi
-                    done
-                    # Remove containers whose names start with our project prefix
-                    docker ps -a --filter "name=equalvoice_b" --format "{{.Names}}" \
-                        | xargs -r docker rm -f 2>/dev/null || true
-                '''
-            }
-        }
-
-        // ── 3. Create .env for compose ─────────────────────────────────────────
+        // ── 2. Create .env for compose ─────────────────────────────────────────
         stage('Environment Setup') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'db-password',      variable: 'DB_PASS'),
-                    string(credentialsId: 'db-root-password', variable: 'DB_ROOT_PASSWORD')
-                ]) {
-                    sh '''
-                        printf "DB_NAME=%s\n"           "${DB_NAME}"           > .env
-                        printf "DB_USER=%s\n"           "${DB_USER}"          >> .env
-                        printf "DB_PASS=%s\n"           "${DB_PASS}"          >> .env
-                        printf "DB_ROOT_PASSWORD=%s\n"  "${DB_ROOT_PASSWORD}" >> .env
-                        printf "BUILD_VERSION=%s\n"     "${BUILD_NUMBER}"     >> .env
-                        printf "VCS_REF=%s\n"           "${GIT_COMMIT}"       >> .env
-                        echo "Environment file created."
-                        grep -v "PASS\\|PASSWORD" .env || true
-                    '''
+                script {
+                    // Write .env without printing passwords to the log
+                    writeFile file: '.env', text: """DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASS=${DB_PASS}
+DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+BUILD_DATE=${sh(script:'date -u +%Y-%m-%dT%H:%M:%SZ', returnStdout: true).trim()}
+VCS_REF=${GIT_COMMIT}
+BUILD_VERSION=${BUILD_NUMBER}
+"""
+                    sh 'echo "Environment file created (passwords redacted)"'
+                    sh 'grep -v "PASS\\|PASSWORD" .env || true'
                 }
             }
         }
 
-        // ── 4. PHP syntax check ────────────────────────────────────────────────
+        // ── 3. PHP syntax check ────────────────────────────────────────────────
         stage('Code Quality') {
             steps {
                 sh '''
                     echo "Running PHP syntax check..."
-                    if ! command -v php > /dev/null 2>&1; then
-                        echo "PHP not available in Jenkins agent — skipping syntax check."
-                        exit 0
-                    fi
                     ERRORS=0
                     while IFS= read -r file; do
                         if ! php -l "$file" > /dev/null 2>&1; then
@@ -101,66 +78,89 @@ pipeline {
             }
         }
 
-        // ── 5. Build Docker Image ──────────────────────────────────────────────
+        // ── 4. Build Docker image ──────────────────────────────────────────────
         stage('Build Docker Image') {
             steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'docker-hub-credentials',
-                                     usernameVariable: 'DOCKER_USER',
-                                     passwordVariable: 'DOCKER_PASS')
-                ]) {
-                    sh '''
-                        docker build \
-                            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-                            --build-arg VCS_REF="${GIT_COMMIT}" \
-                            --build-arg BUILD_VERSION="${BUILD_NUMBER}" \
-                            -t "${REGISTRY}/${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}" \
-                            -t "${REGISTRY}/${DOCKER_USER}/${IMAGE_NAME}:latest" \
-                            .
-                        echo "Built images:"
-                        docker images | grep "${IMAGE_NAME}"
-                    '''
-                }
+                sh '''
+                    docker build \
+                        --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                        --build-arg VCS_REF="${GIT_COMMIT}" \
+                        --build-arg BUILD_VERSION="${BUILD_NUMBER}" \
+                        -t "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}" \
+                        -t "${REGISTRY}/${IMAGE_NAME}:latest" \
+                        .
+                    echo "Built images:"
+                    docker images | grep "${IMAGE_NAME}"
+                '''
             }
         }
 
-        // ── 6. Integration test ────────────────────────────────────────────────
+        // ── 5. Integration test ────────────────────────────────────────────────
         stage('Test Docker Image') {
             steps {
                 sh '''
                     docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" up -d
 
-                    echo "Waiting for services to become healthy (up to 180s)..."
+                    # Wait specifically for the web container to be healthy.
+                    # Checking any service for "healthy" is not enough — MySQL can become
+                    # healthy while the web container is still starting Apache.
+                    echo "Waiting for web container to become healthy (up to 180s)..."
                     ELAPSED=0
-                    until docker-compose -f "${COMPOSE_FILE}" \
-                              -p "${COMPOSE_PROJECT_NAME}" ps | grep -q "(healthy)"; do
+                    WEB_CONTAINER=$(docker-compose -f "${COMPOSE_FILE}" \
+                                        -p "${COMPOSE_PROJECT_NAME}" ps -q web 2>/dev/null)
+                    until [ "$(docker inspect --format='{{.State.Health.Status}}' \
+                                "${WEB_CONTAINER}" 2>/dev/null)" = "healthy" ]; do
                         sleep 5
                         ELAPSED=$((ELAPSED + 5))
+                        # Refresh container ID in case compose restarted it
+                        WEB_CONTAINER=$(docker-compose -f "${COMPOSE_FILE}" \
+                                            -p "${COMPOSE_PROJECT_NAME}" ps -q web 2>/dev/null)
                         if [ "$ELAPSED" -ge 180 ]; then
-                            echo "Services did not become healthy in time."
+                            echo "Web service did not become healthy in time."
                             docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" logs
                             exit 1
                         fi
-                        echo "  Waited ${ELAPSED}s..."
+                        echo "  Waited ${ELAPSED}s — web status: $(docker inspect \
+                            --format='{{.State.Health.Status}}' "${WEB_CONTAINER}" 2>/dev/null || echo unknown)"
                     done
-                    echo "All services healthy."
+                    echo "Web service healthy."
 
+                    # Verify the app responds — retry up to 5 times in case of a brief lag
+                    echo "Checking HTTP response from web..."
+                    PASS=false
+                    for i in 1 2 3 4 5; do
+                        if docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
+                                exec -T web curl -sf --max-time 10 http://localhost/index.php \
+                                -o /dev/null; then
+                            echo "Web OK (attempt $i)"
+                            PASS=true
+                            break
+                        fi
+                        echo "  Attempt $i failed — retrying in 5s..."
+                        sleep 5
+                    done
+                    if [ "$PASS" = "false" ]; then
+                        echo "Web health check failed after 5 attempts."
+                        docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" logs web
+                        exit 1
+                    fi
+
+                    # Verify MySQL is reachable
                     docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
-                        exec -T web curl -sf http://localhost/index.php -o /dev/null \
-                        && echo "Web OK"
+                        exec -T mysql mysqladmin ping -u root \
+                        --password="${DB_ROOT_PASSWORD}" --silent
+
+                    echo "Integration tests passed."
                 '''
             }
             post {
                 always {
-                    sh '''
-                        docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
-                            down --volumes --remove-orphans || true
-                    '''
+                    sh 'docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" down --volumes --remove-orphans || true'
                 }
             }
         }
 
-        // ── 7. Security Scan ───────────────────────────────────────────────────
+        // ── 6. Security scan ───────────────────────────────────────────────────
         stage('Security Scan') {
             steps {
                 sh '''
@@ -193,42 +193,46 @@ pipeline {
             }
         }
 
-        // ── 8. Push to registry (main branch only) ─────────────────────────────
+        // ── 7. Push to registry (main branch only) ─────────────────────────────
         stage('Push Image') {
             when { branch 'main' }
             steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'docker-hub-credentials',
-                                     usernameVariable: 'DOCKER_USER',
-                                     passwordVariable: 'DOCKER_PASS')
-                ]) {
-                    sh '''
-                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-                        docker push "${REGISTRY}/${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
-                        docker push "${REGISTRY}/${DOCKER_USER}/${IMAGE_NAME}:latest"
-                        docker logout
-                        echo "Image pushed: ${REGISTRY}/${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
-                    '''
-                }
+                sh '''
+                    echo "${DOCKER_CREDS_PSW}" | \
+                        docker login -u "${DOCKER_CREDS_USR}" --password-stdin "${REGISTRY}"
+
+                    docker push "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                    docker push "${REGISTRY}/${IMAGE_NAME}:latest"
+
+                    docker logout "${REGISTRY}"
+                    echo "Image pushed: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                '''
             }
         }
 
-        // ── 9. Deploy (main branch only) ───────────────────────────────────────
+        // ── 8. Deploy (main branch only) ───────────────────────────────────────
         stage('Deploy') {
             when { branch 'main' }
             steps {
                 sh '''
-                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" pull
-                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
-                        up -d --remove-orphans
+                    # Update images and redeploy
+                    docker-compose -f "${COMPOSE_FILE}" pull
+                    docker-compose -f "${COMPOSE_FILE}" up -d --remove-orphans
+
+                    # Wait for healthy state before running setup
                     sleep 20
-                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" ps
+                    docker-compose -f "${COMPOSE_FILE}" ps
+
+                    # One-time setup (idempotent)
+                    docker-compose -f "${COMPOSE_FILE}" exec -T web \
+                        php /var/www/html/setup.php || echo "Setup already completed or not required."
+
                     echo "Deployment complete."
                 '''
             }
         }
 
-        // ── 10. Post-deployment smoke tests (main branch only) ─────────────────
+        // ── 9. Post-deployment smoke tests (main branch only) ──────────────────
         stage('Post-Deployment Tests') {
             when { branch 'main' }
             steps {
@@ -245,6 +249,7 @@ pipeline {
                         fi
                     done
                     if [ "$ALL_PASS" = "false" ]; then
+                        echo "One or more pages returned unexpected status codes."
                         exit 1
                     fi
                     echo "Post-deployment tests passed."
@@ -253,30 +258,30 @@ pipeline {
         }
     }
 
-    // NOTE: post{} always runs on the agent that ran the last stage.
-    // Use single-quoted sh('') so variables expand in shell (not Groovy GString)
-    // and env.VAR references are available in the shell environment.
-    // deleteDir() is placed LAST so logs can still be collected on failure.
     post {
+        always {
+            sh '''
+                # Remove .env (contains secrets)
+                rm -f .env
+
+                # Prune dangling images / stopped containers — preserve volumes
+                docker system prune -f || true
+            '''
+        }
         success {
-            echo "Pipeline completed successfully - Build ${BUILD_NUMBER}"
+            echo "Pipeline completed successfully - Build ${BUILD_NUMBER} (${env.IMAGE_TAG})"
         }
         failure {
             sh '''
-                echo "===== BUILD FAILED - collecting logs ====="
-                docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
-                    logs --no-color 2>&1 | tail -100 || true
+                echo "===== BUILD FAILED — collecting logs ====="
+                docker-compose -f "${COMPOSE_FILE}" logs --no-color 2>&1 | tail -100 || true
             '''
+            // Uncomment and configure to add Slack / email notifications:
+            // slackSend channel: '#deployments', color: 'danger',
+            //           message: "FAILED: ${JOB_NAME} #${BUILD_NUMBER}"
         }
-        always {
-            sh '''
-                # Final teardown — safe even if Test stage already ran down
-                docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
-                    down --volumes --remove-orphans 2>/dev/null || true
-                rm -f .env || true
-                docker system prune -f || true
-            '''
-            // deleteDir() last — after all logs are collected
+        cleanup {
+            // Always clean the workspace so credentials are not left on disk
             deleteDir()
         }
     }
