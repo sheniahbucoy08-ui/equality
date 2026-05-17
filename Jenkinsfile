@@ -9,13 +9,13 @@ pipeline {
     }
 
     environment {
-        REGISTRY     = 'docker.io'
-        IMAGE_NAME   = 'equalvoice'
-        DB_NAME      = 'equalvoice_db'
-        DB_USER      = 'equalvoice_user'
-        COMPOSE_FILE = 'docker-compose.yml'
-        DOCKER_HOST  = 'unix:///var/run/docker.sock'
-        // Unique project name per build prevents container name conflicts
+        REGISTRY             = 'docker.io'
+        IMAGE_NAME           = 'equalvoice'
+        DB_NAME              = 'equalvoice_db'
+        DB_USER              = 'equalvoice_user'
+        COMPOSE_FILE         = 'docker-compose.yml'
+        DOCKER_HOST          = 'unix:///var/run/docker.sock'
+        // Per-build project name: containers get unique names → no "already in use" error
         COMPOSE_PROJECT_NAME = "equalvoice_b${BUILD_NUMBER}"
     }
 
@@ -38,16 +38,16 @@ pipeline {
         stage('Pre-flight Cleanup') {
             steps {
                 sh '''
-                    # Remove any stale containers from previous failed runs
+                    # Force-remove any containers from a previous failed run
                     for name in equalvoice_mysql equalvoice_web equalvoice_phpmyadmin; do
                         if docker inspect "$name" > /dev/null 2>&1; then
                             echo "Removing stale container: $name"
                             docker rm -f "$name" || true
                         fi
                     done
-                    # Also clean up using compose project name pattern
-                    docker ps -a --filter "name=equalvoice_b" --format "{{.Names}}" | \
-                        xargs -r docker rm -f 2>/dev/null || true
+                    # Remove containers whose names start with our project prefix
+                    docker ps -a --filter "name=equalvoice_b" --format "{{.Names}}" \
+                        | xargs -r docker rm -f 2>/dev/null || true
                 '''
             }
         }
@@ -60,12 +60,12 @@ pipeline {
                     string(credentialsId: 'db-root-password', variable: 'DB_ROOT_PASSWORD')
                 ]) {
                     sh '''
-                        echo "DB_NAME=${DB_NAME}"           > .env
-                        echo "DB_USER=${DB_USER}"          >> .env
-                        echo "DB_PASS=${DB_PASS}"          >> .env
-                        echo "DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}" >> .env
-                        echo "BUILD_VERSION=${BUILD_NUMBER}" >> .env
-                        echo "VCS_REF=${GIT_COMMIT}"       >> .env
+                        printf "DB_NAME=%s\n"           "${DB_NAME}"           > .env
+                        printf "DB_USER=%s\n"           "${DB_USER}"          >> .env
+                        printf "DB_PASS=%s\n"           "${DB_PASS}"          >> .env
+                        printf "DB_ROOT_PASSWORD=%s\n"  "${DB_ROOT_PASSWORD}" >> .env
+                        printf "BUILD_VERSION=%s\n"     "${BUILD_NUMBER}"     >> .env
+                        printf "VCS_REF=%s\n"           "${GIT_COMMIT}"       >> .env
                         echo "Environment file created."
                         grep -v "PASS\\|PASSWORD" .env || true
                     '''
@@ -128,37 +128,32 @@ pipeline {
         stage('Test Docker Image') {
             steps {
                 sh '''
-                    docker-compose -f "${COMPOSE_FILE}" \
-                        -p "${COMPOSE_PROJECT_NAME}" \
-                        up -d
+                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" up -d
 
-                    echo "Waiting for services to become healthy (up to 120s)..."
+                    echo "Waiting for services to become healthy (up to 180s)..."
                     ELAPSED=0
                     until docker-compose -f "${COMPOSE_FILE}" \
-                              -p "${COMPOSE_PROJECT_NAME}" \
-                              ps | grep -q "healthy"; do
+                              -p "${COMPOSE_PROJECT_NAME}" ps | grep -q "(healthy)"; do
                         sleep 5
                         ELAPSED=$((ELAPSED + 5))
-                        if [ "$ELAPSED" -ge 120 ]; then
+                        if [ "$ELAPSED" -ge 180 ]; then
                             echo "Services did not become healthy in time."
-                            docker-compose -f "${COMPOSE_FILE}" \
-                                -p "${COMPOSE_PROJECT_NAME}" logs
+                            docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" logs
                             exit 1
                         fi
+                        echo "  Waited ${ELAPSED}s..."
                     done
                     echo "All services healthy."
 
-                    docker-compose -f "${COMPOSE_FILE}" \
-                        -p "${COMPOSE_PROJECT_NAME}" \
-                        exec -T web \
-                        curl -sf http://localhost/index.php -o /dev/null && echo "Web OK"
+                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
+                        exec -T web curl -sf http://localhost/index.php -o /dev/null \
+                        && echo "Web OK"
                 '''
             }
             post {
                 always {
                     sh '''
-                        docker-compose -f "${COMPOSE_FILE}" \
-                            -p "${COMPOSE_PROJECT_NAME}" \
+                        docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
                             down --volumes --remove-orphans || true
                     '''
                 }
@@ -223,15 +218,11 @@ pipeline {
             when { branch 'main' }
             steps {
                 sh '''
-                    docker-compose -f "${COMPOSE_FILE}" \
-                        -p "${COMPOSE_PROJECT_NAME}" \
-                        pull
-                    docker-compose -f "${COMPOSE_FILE}" \
-                        -p "${COMPOSE_PROJECT_NAME}" \
+                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" pull
+                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
                         up -d --remove-orphans
                     sleep 20
-                    docker-compose -f "${COMPOSE_FILE}" \
-                        -p "${COMPOSE_PROJECT_NAME}" ps
+                    docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" ps
                     echo "Deployment complete."
                 '''
             }
@@ -262,27 +253,31 @@ pipeline {
         }
     }
 
+    // NOTE: post{} always runs on the agent that ran the last stage.
+    // Use single-quoted sh('') so variables expand in shell (not Groovy GString)
+    // and env.VAR references are available in the shell environment.
+    // deleteDir() is placed LAST so logs can still be collected on failure.
     post {
-        always {
-            sh """
-                docker-compose -f ${COMPOSE_FILE} \
-                    -p ${COMPOSE_PROJECT_NAME} \
-                    down --volumes --remove-orphans 2>/dev/null || true
-                rm -f .env || true
-                docker system prune -f || true
-            """
-            deleteDir()
-        }
         success {
             echo "Pipeline completed successfully - Build ${BUILD_NUMBER}"
         }
         failure {
-            sh """
-                echo '===== BUILD FAILED - collecting logs ====='
-                docker-compose -f ${COMPOSE_FILE} \
-                    -p ${COMPOSE_PROJECT_NAME} \
+            sh '''
+                echo "===== BUILD FAILED - collecting logs ====="
+                docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
                     logs --no-color 2>&1 | tail -100 || true
-            """
+            '''
+        }
+        always {
+            sh '''
+                # Final teardown — safe even if Test stage already ran down
+                docker-compose -f "${COMPOSE_FILE}" -p "${COMPOSE_PROJECT_NAME}" \
+                    down --volumes --remove-orphans 2>/dev/null || true
+                rm -f .env || true
+                docker system prune -f || true
+            '''
+            // deleteDir() last — after all logs are collected
+            deleteDir()
         }
     }
 }
