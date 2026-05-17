@@ -250,11 +250,20 @@ BUILD_VERSION=${env.BUILD_NUMBER}
                     fi
 
                     echo "Checking for hardcoded credentials..."
-                    CREDS=$(grep -rn -E "password[[:space:]]*=[[:space:]]*['\"][^$]" \
-                                --include="*.php" \
-                                --exclude-dir=".git" \
-                                . 2>/dev/null || true)
-                    if [ -n "$CREDS" ]; then
+                    # Two passes — one for single-quoted passwords, one for
+                    # double-quoted. Mixing both quote styles inside a single
+                    # shell-quoted regex is a guaranteed way to confuse dash.
+                    CREDS_SQ=$(grep -rn -E "password[[:space:]]*=[[:space:]]*'[^\$]" \
+                                    --include='*.php' \
+                                    --exclude-dir='.git' \
+                                    . 2>/dev/null || true)
+                    CREDS_DQ=$(grep -rn -E 'password[[:space:]]*=[[:space:]]*"[^$]' \
+                                    --include='*.php' \
+                                    --exclude-dir='.git' \
+                                    . 2>/dev/null || true)
+                    CREDS="${CREDS_SQ}
+${CREDS_DQ}"
+                    if [ -n "$(echo "$CREDS" | tr -d '[:space:]')" ]; then
                         echo "WARNING - possible hardcoded credentials:"
                         echo "$CREDS"
                     else
