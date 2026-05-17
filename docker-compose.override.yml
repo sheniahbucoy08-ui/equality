@@ -27,6 +27,12 @@ services:
   web:
     ports:
       - "8000:80"
+    # Live bind-mount the project so PHP/CSS/JS edits are visible immediately
+    # without rebuilding the image. This is dev-only — Jenkins CI uses the
+    # base docker-compose.yml without this override, so the image-baked code
+    # is what's tested.
+    volumes:
+      - ./:/var/www/html
 
   phpmyadmin:
     ports:
