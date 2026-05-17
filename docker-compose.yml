@@ -5,7 +5,7 @@ services:
   # ── MySQL 8.0 ────────────────────────────────────────────────────────────────
   mysql:
     image: mysql:8.0
-    container_name: equalvoice_mysql
+    # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_123}
@@ -14,7 +14,7 @@ services:
       MYSQL_PASSWORD:      ${DB_PASS:-user_password_456}
       MYSQL_ROOT_HOST:     '%'
     ports:
-      - "3306:3306"
+      - "3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./sql:/docker-entrypoint-initdb.d:ro
@@ -37,10 +37,10 @@ services:
         BUILD_DATE: ${BUILD_DATE:-unknown}
         VCS_REF:    ${VCS_REF:-unknown}
         BUILD_VERSION: ${BUILD_VERSION:-dev}
-    container_name: equalvoice_web
+    # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "80"
     environment:
       DB_HOST:          mysql
       DB_NAME:          ${DB_NAME:-equalvoice_db}
@@ -62,10 +62,10 @@ services:
   # ── phpMyAdmin ────────────────────────────────────────────────────────────────
   phpmyadmin:
     image: phpmyadmin:latest
-    container_name: equalvoice_phpmyadmin
+    # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8080"
     environment:
       PMA_HOST:          mysql
       PMA_USER:          ${DB_USER:-equalvoice_user}

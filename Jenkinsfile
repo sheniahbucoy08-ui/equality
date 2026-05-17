@@ -14,8 +14,9 @@ pipeline {
         DB_NAME      = 'equalvoice_db'
         DB_USER      = 'equalvoice_user'
         COMPOSE_FILE = 'docker-compose.yml'
-        // Docker socket path — Jenkins runs commands on the host via mounted socket
         DOCKER_HOST  = 'unix:///var/run/docker.sock'
+        // Unique project name per build prevents container name conflicts
+        COMPOSE_PROJECT_NAME = "equalvoice_b${BUILD_NUMBER}"
     }
 
     stages {
@@ -33,7 +34,25 @@ pipeline {
             }
         }
 
-        // ── 2. Create .env for compose ─────────────────────────────────────────
+        // ── 2. Pre-flight cleanup ──────────────────────────────────────────────
+        stage('Pre-flight Cleanup') {
+            steps {
+                sh '''
+                    # Remove any stale containers from previous failed runs
+                    for name in equalvoice_mysql equalvoice_web equalvoice_phpmyadmin; do
+                        if docker inspect "$name" > /dev/null 2>&1; then
+                            echo "Removing stale container: $name"
+                            docker rm -f "$name" || true
+                        fi
+                    done
+                    # Also clean up using compose project name pattern
+                    docker ps -a --filter "name=equalvoice_b" --format "{{.Names}}" | \
+                        xargs -r docker rm -f 2>/dev/null || true
+                '''
+            }
+        }
+
+        // ── 3. Create .env for compose ─────────────────────────────────────────
         stage('Environment Setup') {
             steps {
                 withCredentials([
@@ -54,7 +73,7 @@ pipeline {
             }
         }
 
-        // ── 3. PHP syntax check ────────────────────────────────────────────────
+        // ── 4. PHP syntax check ────────────────────────────────────────────────
         stage('Code Quality') {
             steps {
                 sh '''
@@ -82,7 +101,7 @@ pipeline {
             }
         }
 
-        // ── 4. Build Docker Image ──────────────────────────────────────────────
+        // ── 5. Build Docker Image ──────────────────────────────────────────────
         stage('Build Docker Image') {
             steps {
                 withCredentials([
@@ -105,37 +124,48 @@ pipeline {
             }
         }
 
-        // ── 5. Integration test ────────────────────────────────────────────────
+        // ── 6. Integration test ────────────────────────────────────────────────
         stage('Test Docker Image') {
             steps {
                 sh '''
-                    docker-compose -f "${COMPOSE_FILE}" up -d
+                    docker-compose -f "${COMPOSE_FILE}" \
+                        -p "${COMPOSE_PROJECT_NAME}" \
+                        up -d
 
-                    echo "Waiting for services to become healthy (up to 90s)..."
+                    echo "Waiting for services to become healthy (up to 120s)..."
                     ELAPSED=0
-                    until docker-compose -f "${COMPOSE_FILE}" ps | grep -q "healthy"; do
+                    until docker-compose -f "${COMPOSE_FILE}" \
+                              -p "${COMPOSE_PROJECT_NAME}" \
+                              ps | grep -q "healthy"; do
                         sleep 5
                         ELAPSED=$((ELAPSED + 5))
-                        if [ "$ELAPSED" -ge 90 ]; then
+                        if [ "$ELAPSED" -ge 120 ]; then
                             echo "Services did not become healthy in time."
-                            docker-compose -f "${COMPOSE_FILE}" logs
+                            docker-compose -f "${COMPOSE_FILE}" \
+                                -p "${COMPOSE_PROJECT_NAME}" logs
                             exit 1
                         fi
                     done
                     echo "All services healthy."
 
-                    docker-compose -f "${COMPOSE_FILE}" exec -T web \
+                    docker-compose -f "${COMPOSE_FILE}" \
+                        -p "${COMPOSE_PROJECT_NAME}" \
+                        exec -T web \
                         curl -sf http://localhost/index.php -o /dev/null && echo "Web OK"
                 '''
             }
             post {
                 always {
-                    sh 'docker-compose -f "${COMPOSE_FILE}" down --volumes || true'
+                    sh '''
+                        docker-compose -f "${COMPOSE_FILE}" \
+                            -p "${COMPOSE_PROJECT_NAME}" \
+                            down --volumes --remove-orphans || true
+                    '''
                 }
             }
         }
 
-        // ── 6. Security Scan ───────────────────────────────────────────────────
+        // ── 7. Security Scan ───────────────────────────────────────────────────
         stage('Security Scan') {
             steps {
                 sh '''
@@ -168,7 +198,7 @@ pipeline {
             }
         }
 
-        // ── 7. Push to registry (main branch only) ─────────────────────────────
+        // ── 8. Push to registry (main branch only) ─────────────────────────────
         stage('Push Image') {
             when { branch 'main' }
             steps {
@@ -188,21 +218,26 @@ pipeline {
             }
         }
 
-        // ── 8. Deploy (main branch only) ───────────────────────────────────────
+        // ── 9. Deploy (main branch only) ───────────────────────────────────────
         stage('Deploy') {
             when { branch 'main' }
             steps {
                 sh '''
-                    docker-compose -f "${COMPOSE_FILE}" pull
-                    docker-compose -f "${COMPOSE_FILE}" up -d --remove-orphans
+                    docker-compose -f "${COMPOSE_FILE}" \
+                        -p "${COMPOSE_PROJECT_NAME}" \
+                        pull
+                    docker-compose -f "${COMPOSE_FILE}" \
+                        -p "${COMPOSE_PROJECT_NAME}" \
+                        up -d --remove-orphans
                     sleep 20
-                    docker-compose -f "${COMPOSE_FILE}" ps
+                    docker-compose -f "${COMPOSE_FILE}" \
+                        -p "${COMPOSE_PROJECT_NAME}" ps
                     echo "Deployment complete."
                 '''
             }
         }
 
-        // ── 9. Post-deployment smoke tests (main branch only) ──────────────────
+        // ── 10. Post-deployment smoke tests (main branch only) ─────────────────
         stage('Post-Deployment Tests') {
             when { branch 'main' }
             steps {
@@ -229,28 +264,25 @@ pipeline {
 
     post {
         always {
-            node('') {
-                sh '''
-                    rm -f .env || true
-                    docker system prune -f || true
-                '''
-            }
+            sh """
+                docker-compose -f ${COMPOSE_FILE} \
+                    -p ${COMPOSE_PROJECT_NAME} \
+                    down --volumes --remove-orphans 2>/dev/null || true
+                rm -f .env || true
+                docker system prune -f || true
+            """
+            deleteDir()
         }
         success {
             echo "Pipeline completed successfully - Build ${BUILD_NUMBER}"
         }
         failure {
-            node('') {
-                sh '''
-                    echo "===== BUILD FAILED - collecting logs ====="
-                    docker-compose -f docker-compose.yml logs --no-color 2>&1 | tail -100 || true
-                '''
-            }
-        }
-        cleanup {
-            node('') {
-                deleteDir()
-            }
+            sh """
+                echo '===== BUILD FAILED - collecting logs ====='
+                docker-compose -f ${COMPOSE_FILE} \
+                    -p ${COMPOSE_PROJECT_NAME} \
+                    logs --no-color 2>&1 | tail -100 || true
+            """
         }
     }
 }
