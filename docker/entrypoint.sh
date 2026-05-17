@@ -9,6 +9,16 @@ echo "=========================================="
 DB_HOST_NAME="${DB_HOST:-mysql}"
 DB_PORT_NUM="${DB_PORT:-3306}"
 
+# The Debian "default-mysql-client" package on Trixie is actually mariadb-client
+# 11.x, which validates TLS certificates strictly. The MySQL 8 official image
+# presents an auto-generated self-signed cert, which mariadb-client refuses
+# with:  ERROR 2026 (HY000): TLS/SSL error: self-signed certificate ...
+# On the internal compose network we don't need TLS at all, so disable it.
+# `--skip-ssl` works on mariadb-client; `--ssl-mode=DISABLED` works on the
+# real mysql-client. We standardize on --skip-ssl because that's what the
+# installed client supports.
+MYSQL_OPTS="--skip-ssl --protocol=tcp"
+
 # ---- Stage A: wait until the MySQL TCP port is accepting connections ----
 # We use bash's built-in /dev/tcp test instead of `mysqladmin ping` because
 # the Debian package `default-mysql-client` actually installs mariadb-client.
@@ -34,17 +44,17 @@ echo "  MySQL TCP port is open after ${COUNTER} attempts."
 # ---- Stage B: verify our credentials actually work ----
 # If this fails, the password/user in .env doesn't match what the MySQL
 # init script created. We don't suppress stderr so the real error surfaces.
-echo "  Verifying credentials with a SELECT 1..."
+echo "  Verifying credentials with a SELECT 1 (TLS disabled for local link)..."
 AUTH_TRIES=0
 MAX_AUTH=30
-until mysql -h"${DB_HOST_NAME}" -P "${DB_PORT_NUM}" --protocol=tcp \
+until mysql ${MYSQL_OPTS} -h"${DB_HOST_NAME}" -P "${DB_PORT_NUM}" \
             -u"${DB_USER}" -p"${DB_PASS}" \
             -e "SELECT 1;" >/dev/null 2>&1; do
     AUTH_TRIES=$((AUTH_TRIES + 1))
     if [ "$AUTH_TRIES" -ge "$MAX_AUTH" ]; then
         echo "ERROR: credentials never accepted after $((MAX_AUTH * 2))s."
         echo "Running once with stderr visible to expose the real error:"
-        mysql -h"${DB_HOST_NAME}" -P "${DB_PORT_NUM}" --protocol=tcp \
+        mysql ${MYSQL_OPTS} -h"${DB_HOST_NAME}" -P "${DB_PORT_NUM}" \
               -u"${DB_USER}" -p"${DB_PASS}" -e "SELECT 1;" || true
         exit 1
     fi
@@ -57,9 +67,12 @@ echo "  MySQL is ready and credentials work."
 
 # ── Bootstrap database ──────────────────────────────────────────────────────────
 echo "[2/4] Checking database..."
-if ! mysql -h"${DB_HOST:-mysql}" -u"${DB_USER}" -p"${DB_PASS}" -e "USE ${DB_NAME};" 2>/dev/null; then
+if ! mysql ${MYSQL_OPTS} -h"${DB_HOST_NAME}" -P "${DB_PORT_NUM}" \
+           -u"${DB_USER}" -p"${DB_PASS}" \
+           -e "USE ${DB_NAME};" 2>/dev/null; then
     echo "  Database '${DB_NAME}' not found — creating..."
-    mysql -h"${DB_HOST:-mysql}" -u"root" -p"${DB_ROOT_PASSWORD}" <<SQL
+    mysql ${MYSQL_OPTS} -h"${DB_HOST_NAME}" -P "${DB_PORT_NUM}" \
+          -u"root" -p"${DB_ROOT_PASSWORD}" <<SQL
 CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;
 CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
 GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'%';
@@ -68,8 +81,9 @@ SQL
 
     if [ -f "/var/www/html/sql/equalvoice.sql" ]; then
         echo "  Importing schema from sql/equalvoice.sql..."
-        mysql -h"${DB_HOST:-mysql}" -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" \
-            < /var/www/html/sql/equalvoice.sql
+        mysql ${MYSQL_OPTS} -h"${DB_HOST_NAME}" -P "${DB_PORT_NUM}" \
+              -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" \
+              < /var/www/html/sql/equalvoice.sql
         echo "  Schema imported successfully."
     fi
 else
