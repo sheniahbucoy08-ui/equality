@@ -25,7 +25,7 @@ $activeTab = in_array($activeTab, ['login', 'register']) ? $activeTab : 'login';
   <!-- Left panel: brand + features -->
   <div class="auth-panel">
     <div class="auth-brand">
-      <div class="brand-icon"><img src="/equalvoice/images/Logo.jpg" alt="EqualVoice"></div>
+      <div class="brand-icon" aria-hidden="true"><i class="fas fa-equals"></i></div>
       <h1>EqualVoice</h1>
       <p>Gender-Balanced Leadership Platform</p>
     </div>

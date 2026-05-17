@@ -26,7 +26,7 @@ if (isLoggedIn()) {
 <!-- Navigation -->
 <nav class="landing-nav" id="landingNav">
   <div class="nav-logo">
-    <img src="/equalvoice/images/Logo.jpg" alt="EqualVoice" class="logo-img">
+    <div class="logo-icon" aria-hidden="true"><i class="fas fa-equals"></i></div>
     <span>EqualVoice</span>
   </div>
   <div class="nav-actions">

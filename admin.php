@@ -34,8 +34,8 @@ $initials = function(string $n): string {
     <div class="pride-stripe-top"></div>
 
     <div class="brand">
-      <div class="brand-logo">
-        <img src="/equalvoice/images/Logo.jpg" alt="EqualVoice">
+      <div class="brand-logo" aria-hidden="true">
+        <i class="fas fa-equals"></i>
       </div>
       <div class="brand-info">
         <div class="brand-name">EqualVoice</div>

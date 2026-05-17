@@ -28,7 +28,7 @@ $initials = function(string $n): string {
   <!-- Sidebar (same as dashboard) -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar__brand">
-      <div class="brand-logo"><img src="/equalvoice/images/Logo.jpg" alt="EqualVoice"></div>
+      <div class="brand-logo" aria-hidden="true"><i class="fas fa-equals"></i></div>
       <div class="brand-name">EqualVoice<span>Leadership Platform</span></div>
     </div>
     <nav class="sidebar__nav">
