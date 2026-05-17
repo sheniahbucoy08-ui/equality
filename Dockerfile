@@ -60,8 +60,8 @@ RUN rm -f  /var/www/html/Dockerfile \
 
 # ── 6. Permissions ─────────────────────────────────────────────────────────────
 RUN chown -R www-data:www-data /var/www/html \
-    && find /var/www/html -type d -exec chmod 755 {} \; \
-    && find /var/www/html -type f -exec chmod 644 {} \;
+    && find /var/www/html -type d -exec chmod 755 {} + \
+    && find /var/www/html -type f -exec chmod 644 {} +
 
 # ── 7. Log directories ─────────────────────────────────────────────────────────
 RUN mkdir -p /var/log/apache2 /var/log/php \

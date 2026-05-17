@@ -43,11 +43,11 @@ else
 fi
 
 # ── File permissions ────────────────────────────────────────────────────────────
-echo "[3/4] Setting file permissions..."
-chown -R www-data:www-data /var/www/html
-find /var/www/html -type d -exec chmod 755 {} \;
-find /var/www/html -type f -exec chmod 644 {} \;
-echo "  Permissions set."
+# Skipped on startup — the Dockerfile already runs chown/chmod during image
+# build. Re-running here every container start was forking one chmod per file
+# (because of the `\;` terminator) and could add minutes to startup time, during
+# which Apache wasn't yet listening and the healthcheck would keep timing out.
+echo "[3/4] File permissions (skipped — already applied at image build time)."
 
 # ── Start Apache ────────────────────────────────────────────────────────────────
 echo "[4/4] Starting Apache web server..."

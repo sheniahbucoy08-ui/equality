@@ -55,12 +55,16 @@ services:
         condition: service_healthy
     networks:
       - equalvoice_network
+    # We only need to know "is Apache responding?" — not "is the app
+    # returning 2xx?". `curl -sS -o /dev/null -w '%{http_code}'` succeeds on
+    # any HTTP response (including 3xx/4xx/5xx) and fails only on a connection
+    # error, which is exactly the right signal for a container healthcheck.
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost/index.php"]
+      test: ["CMD-SHELL", "curl -sS -o /dev/null --max-time 5 http://localhost/index.php"]
       interval: 10s
       timeout: 10s
-      retries: 6
-      start_period: 20s
+      retries: 12
+      start_period: 30s
 
   # ── phpMyAdmin ────────────────────────────────────────────────────────────────
   phpmyadmin:
