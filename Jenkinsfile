@@ -56,9 +56,15 @@ BUILD_VERSION=${env.BUILD_NUMBER}
         }
 
         // ── 3. PHP syntax check ────────────────────────────────────────────────
-        // Runs inside a throwaway php:8.1-cli container so we don't depend on
-        // PHP being installed on the Jenkins agent. Uses a temp file instead of
-        // bash process substitution so it works under /bin/sh (dash).
+        // The Jenkins agent itself runs inside a container, so a naive
+        //   docker run -v "$(pwd):/app" ...
+        // would bind a non-existent host path and the inner container would
+        // see an empty workspace. We use `--volumes-from $(hostname)` so the
+        // lint container shares the Jenkins container's /var/jenkins_home
+        // volume (which contains the workspace).
+        //
+        // Uses a temp file instead of bash process substitution so the host-
+        // side shell works under /bin/sh (dash on the Jenkins image).
         stage('Code Quality') {
             steps {
                 sh '''
@@ -79,10 +85,15 @@ BUILD_VERSION=${env.BUILD_NUMBER}
                     fi
 
                     docker run --rm \
-                        -v "$(pwd)":/app \
-                        -w /app \
+                        --volumes-from "$(hostname)" \
+                        -w "$(pwd)" \
                         php:8.1-cli \
                         sh -c '
+                            if [ ! -f php_files.txt ]; then
+                                echo "ERROR: php_files.txt not visible inside lint container."
+                                echo "PWD=$(pwd) — workspace volume sharing failed."
+                                exit 2
+                            fi
                             ERRORS=0
                             while IFS= read -r file; do
                                 if ! php -l "$file" > /dev/null 2>&1; then
@@ -95,7 +106,7 @@ BUILD_VERSION=${env.BUILD_NUMBER}
                                 echo "Found $ERRORS PHP syntax error(s). Aborting."
                                 exit 1
                             fi
-                            echo "PHP syntax check passed."
+                            echo "PHP syntax check passed (${ERRORS} errors)."
                         '
                     RC=$?
                     rm -f php_files.txt

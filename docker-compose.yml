@@ -18,13 +18,18 @@ services:
       - ./sql:/docker-entrypoint-initdb.d:ro
     networks:
       - equalvoice_network
+    # IMPORTANT: must use TCP (-h 127.0.0.1 + --protocol=tcp on port 3306).
+    # The MySQL official image starts a temporary socket-only server (port=0)
+    # during init; a plain `-h localhost` ping passes against that temp server,
+    # which makes compose mark MySQL "healthy" before the real server is ready.
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost",
+      test: ["CMD", "mysqladmin", "ping",
+             "-h", "127.0.0.1", "-P", "3306", "--protocol=tcp",
              "-u", "root", "--password=${DB_ROOT_PASSWORD:-root_password_123}"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 20
+      start_period: 60s
 
   # ── PHP / Apache web server ───────────────────────────────────────────────────
   web:

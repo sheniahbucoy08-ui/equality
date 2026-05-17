@@ -8,11 +8,12 @@ echo "=========================================="
 # ── Wait for MySQL ──────────────────────────────────────────────────────────────
 echo "[1/4] Waiting for MySQL to be ready..."
 COUNTER=0
-MAX_WAIT=60
-until mysqladmin ping -h"${DB_HOST:-mysql}" -u"${DB_USER}" -p"${DB_PASS}" --silent 2>/dev/null; do
+MAX_WAIT=150
+until mysqladmin ping -h"${DB_HOST:-mysql}" -P 3306 --protocol=tcp \
+                       -u"${DB_USER}" -p"${DB_PASS}" --silent 2>/dev/null; do
     COUNTER=$((COUNTER + 1))
     if [ "$COUNTER" -ge "$MAX_WAIT" ]; then
-        echo "ERROR: MySQL did not become ready within ${MAX_WAIT} seconds. Aborting."
+        echo "ERROR: MySQL did not become ready within $((MAX_WAIT * 2)) seconds. Aborting."
         exit 1
     fi
     echo "  Attempt $COUNTER/$MAX_WAIT - MySQL not ready yet, retrying..."
