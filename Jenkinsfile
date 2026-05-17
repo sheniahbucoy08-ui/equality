@@ -9,15 +9,16 @@ pipeline {
     }
 
     environment {
-        REGISTRY        = 'docker.io'
-        IMAGE_NAME      = 'equalvoice'
+        REGISTRY             = 'docker.io'
+        IMAGE_NAME           = 'equalvoice'
         // Tag = buildNumber_shortCommit  (GIT_COMMIT available after checkout)
-        DOCKER_CREDS    = credentials('docker-hub-credentials')
-        DB_NAME         = 'equalvoice_db'
-        DB_USER         = 'equalvoice_user'
-        DB_PASS         = credentials('db-password')
-        DB_ROOT_PASSWORD = credentials('db-root-password')
-        COMPOSE_FILE    = 'docker-compose.yml'
+        DOCKER_CREDS         = credentials('docker-hub-credentials')
+        DB_NAME              = 'equalvoice_db'
+        DB_USER              = 'equalvoice_user'
+        DB_PASS              = credentials('db-password')
+        DB_ROOT_PASSWORD     = credentials('db-root-password')
+        COMPOSE_FILE         = 'docker-compose.yml'
+        COMPOSE_PROJECT_NAME = "equalvoice_${BUILD_NUMBER}"
     }
 
     stages {
@@ -40,13 +41,13 @@ pipeline {
             steps {
                 script {
                     // Write .env without printing passwords to the log
-                    writeFile file: '.env', text: """DB_NAME=${DB_NAME}
-DB_USER=${DB_USER}
-DB_PASS=${DB_PASS}
-DB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+                    writeFile file: '.env', text: """DB_NAME=${env.DB_NAME}
+DB_USER=${env.DB_USER}
+DB_PASS=${env.DB_PASS}
+DB_ROOT_PASSWORD=${env.DB_ROOT_PASSWORD}
 BUILD_DATE=${sh(script:'date -u +%Y-%m-%dT%H:%M:%SZ', returnStdout: true).trim()}
-VCS_REF=${GIT_COMMIT}
-BUILD_VERSION=${BUILD_NUMBER}
+VCS_REF=${env.GIT_COMMIT}
+BUILD_VERSION=${env.BUILD_NUMBER}
 """
                     sh 'echo "Environment file created (passwords redacted)"'
                     sh 'grep -v "PASS\\|PASSWORD" .env || true'
