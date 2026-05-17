@@ -56,25 +56,50 @@ BUILD_VERSION=${env.BUILD_NUMBER}
         }
 
         // ── 3. PHP syntax check ────────────────────────────────────────────────
+        // Runs inside a throwaway php:8.1-cli container so we don't depend on
+        // PHP being installed on the Jenkins agent. Uses a temp file instead of
+        // bash process substitution so it works under /bin/sh (dash).
         stage('Code Quality') {
             steps {
                 sh '''
                     echo "Running PHP syntax check..."
-                    ERRORS=0
-                    while IFS= read -r file; do
-                        if ! php -l "$file" > /dev/null 2>&1; then
-                            echo "SYNTAX ERROR: $file"
-                            php -l "$file"
-                            ERRORS=$((ERRORS + 1))
-                        fi
-                    done < <(find . -name "*.php" -type f \
-                               ! -path "./.git/*" \
-                               ! -path "./vendor/*")
-                    if [ "$ERRORS" -gt 0 ]; then
-                        echo "Found $ERRORS PHP syntax error(s). Aborting."
-                        exit 1
+
+                    find . -type f -name "*.php" \
+                        ! -path "./.git/*" \
+                        ! -path "./vendor/*" \
+                        ! -path "./node_modules/*" > php_files.txt
+
+                    TOTAL=$(wc -l < php_files.txt | tr -d " ")
+                    echo "Found ${TOTAL} PHP file(s) to check."
+
+                    if [ "${TOTAL}" -eq 0 ]; then
+                        echo "No PHP files found — skipping."
+                        rm -f php_files.txt
+                        exit 0
                     fi
-                    echo "PHP syntax check passed."
+
+                    docker run --rm \
+                        -v "$(pwd)":/app \
+                        -w /app \
+                        php:8.1-cli \
+                        sh -c '
+                            ERRORS=0
+                            while IFS= read -r file; do
+                                if ! php -l "$file" > /dev/null 2>&1; then
+                                    echo "SYNTAX ERROR: $file"
+                                    php -l "$file"
+                                    ERRORS=$((ERRORS + 1))
+                                fi
+                            done < php_files.txt
+                            if [ "$ERRORS" -gt 0 ]; then
+                                echo "Found $ERRORS PHP syntax error(s). Aborting."
+                                exit 1
+                            fi
+                            echo "PHP syntax check passed."
+                        '
+                    RC=$?
+                    rm -f php_files.txt
+                    exit $RC
                 '''
             }
         }
