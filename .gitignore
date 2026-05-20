@@ -1,0 +1,33 @@
+# Environment and secrets
+.env
+.env.local
+.jenkins-token
+
+# Extracted reference / archives
+hrms-main-ref/
+hrms-main.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temp
+*.log
+logs/
+*.tmp
+*.temp
+
+# CI/CD runtime
+backups/
+
+# User uploads (if added later)
+uploads/*
+!uploads/.gitkeep

@@ -13,7 +13,7 @@
 #
 # Port choices and why they don't collide:
 #   8000  → XAMPP Apache already owns 80, so we use 8000 instead
-#   8081  → Jenkins already owns 8080, so we use 8081 instead
+#   8081  → avoids clashing with other local services; Jenkins uses 9090 (see docker-compose.jenkins.yml)
 #
 # MySQL is intentionally NOT bound to a host port:
 #   - phpMyAdmin (above) covers the browsing/SQL-runner use case.

@@ -1,0 +1,14 @@
+# CI override — runs alongside the always-on EqualVoice stack.
+#
+# Smoke tests curl web on 8888; web talks to mysql via the internal network.
+services:
+  web:
+    container_name: equalvoice_web_ci
+    ports: !override
+      - "8888:80"
+  mysql:
+    container_name: equalvoice_mysql_ci
+    ports: !reset []
+  phpmyadmin:
+    container_name: equalvoice_pma_ci
+    ports: !reset []

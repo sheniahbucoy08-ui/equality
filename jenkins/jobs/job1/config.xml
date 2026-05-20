@@ -1,0 +1,74 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>Job1 - Build: PHP lint and Docker image (equalvoice-app)</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>10</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>5</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+set -eux
+
+bash /var/jenkins_home/ci-scripts/jenkins-checkout.sh
+
+echo "======================================"
+echo "Job1 - EqualVoice Build #${BUILD_NUMBER}"
+echo "======================================"
+
+export IMAGE_NAME="equalvoice-app"
+export IMAGE_TAG="${BUILD_NUMBER}"
+export GIT_COMMIT_SHORT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+export GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+
+echo "Git: ${GIT_BRANCH} @ ${GIT_COMMIT_SHORT}"
+
+echo "Step 1: PHP lint..."
+docker run --rm -v "$PWD":/app -w /app php:8.1-cli \
+  sh -c "find . -name '*.php' -not -path './vendor/*' -not -path './.git/*' -print0 | xargs -0 -n1 php -l"
+
+echo "Step 2: Docker build..."
+docker build \
+  --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --build-arg VCS_REF="${GIT_COMMIT_SHORT}" \
+  --build-arg BUILD_VERSION="${BUILD_NUMBER}" \
+  --tag "${IMAGE_NAME}:${IMAGE_TAG}" \
+  --tag "${IMAGE_NAME}:latest" \
+  --label "build.number=${BUILD_NUMBER}" \
+  --label "git.commit=${GIT_COMMIT_SHORT}" \
+  --label "git.branch=${GIT_BRANCH}" \
+  .
+
+docker images | grep "${IMAGE_NAME}" | head -5
+echo "Build OK - ${IMAGE_NAME}:${IMAGE_TAG}"
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers>
+    <hudson.tasks.BuildTrigger>
+      <childProjects>job2</childProjects>
+      <threshold>
+        <name>SUCCESS</name>
+        <ordinal>0</ordinal>
+        <color>BLUE</color>
+        <completeBuild>true</completeBuild>
+      </threshold>
+    </hudson.tasks.BuildTrigger>
+  </publishers>
+  <buildWrappers/>
+</project>

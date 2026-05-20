@@ -1,0 +1,46 @@
+# Jenkins only — separate project/network so app "compose down" never stops Jenkins
+name: equalvoice-jenkins
+
+services:
+  jenkins:
+    build:
+      context: ./docker/jenkins
+      dockerfile: Dockerfile
+    image: equalvoice-jenkins:lts
+    container_name: equalvoice_jenkins
+    restart: unless-stopped
+    ports:
+      - "9090:8080"
+      # Agent port not published on host — avoids clash with other Jenkins instances.
+      # Inbound agents are not required when Jenkins uses the host Docker socket.
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./jenkins/jobs:/usr/share/jenkins/ref/jobs-seed:ro
+      - ./docker/jenkins/init.groovy.d:/usr/share/jenkins/ref/init.groovy.d:ro
+      - ./scripts:/var/jenkins_home/ci-scripts:ro
+      - .:/var/jenkins_home/project-seed:ro
+    env_file:
+      - .env
+    environment:
+      JAVA_OPTS: "-Xmx2048m -Djenkins.install.runSetupWizard=false"
+      JENKINS_JAVA_OPTIONS: "-Dhudson.security.csrf.protection.enabled=true"
+      COMPOSE_PROJECT_NAME: equalvoice
+      JENKINS_ADMIN_USER: ${JENKINS_ADMIN_USER:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-admin123}
+    networks:
+      - jenkins_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  jenkins_home:
+    driver: local
+
+networks:
+  jenkins_net:
+    driver: bridge

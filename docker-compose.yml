@@ -3,7 +3,7 @@ services:
   # ── MySQL 8.0 ────────────────────────────────────────────────────────────────
   mysql:
     image: mysql:8.0
-    # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
+    container_name: equalvoice_mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password_123}
@@ -44,7 +44,7 @@ services:
         BUILD_DATE: ${BUILD_DATE:-unknown}
         VCS_REF:    ${VCS_REF:-unknown}
         BUILD_VERSION: ${BUILD_VERSION:-dev}
-    # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
+    container_name: equalvoice_web
     restart: unless-stopped
     # Random host port in CI; see docker-compose.override.yml for the fixed
     # local-dev mapping (8000 -> container 80).
@@ -75,7 +75,7 @@ services:
   # ── phpMyAdmin ────────────────────────────────────────────────────────────────
   phpmyadmin:
     image: phpmyadmin:latest
-    # No container_name — compose generates a unique name from COMPOSE_PROJECT_NAME
+    container_name: equalvoice_pma
     restart: unless-stopped
     # Random host port in CI; see docker-compose.override.yml for the fixed
     # local-dev mapping (8081 -> container 80) which avoids clashing with

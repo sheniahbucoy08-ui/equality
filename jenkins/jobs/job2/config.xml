@@ -1,0 +1,116 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<project>
+  <actions/>
+  <description>Job2 - Test: database connectivity and application smoke test</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>30</daysToKeep>
+        <numToKeep>10</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>5</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+  </properties>
+  <scm class="hudson.scm.NullSCM"/>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers/>
+  <concurrentBuild>false</concurrentBuild>
+  <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/bash
+set -eux
+
+bash /var/jenkins_home/ci-scripts/jenkins-checkout.sh
+
+if [[ -f .env ]]; then set -a; source .env; set +a; fi
+
+COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-equalvoice}"
+COMPOSE="-f docker-compose.yml"
+DB_ROOT="${DB_ROOT_PASSWORD:-root_password_123}"
+DB_USER="${DB_USER:-equalvoice_user}"
+DB_PASS="${DB_PASS:-user_password_456}"
+DB_NAME="${DB_NAME:-equalvoice_db}"
+
+echo "======================================"
+echo "Job2 - EqualVoice Test"
+echo "======================================"
+
+echo "Step 1: Start database..."
+docker compose -p "${COMPOSE_PROJECT}" ${COMPOSE} up -d mysql
+
+MYSQL_ID=""
+for i in $(seq 1 60); do
+  MYSQL_ID="$(docker compose -p "${COMPOSE_PROJECT}" ${COMPOSE} ps -q mysql 2>/dev/null | head -1)"
+  if [[ -n "${MYSQL_ID}" ]] &amp;&amp; docker exec "${MYSQL_ID}" mysqladmin ping \
+      -h 127.0.0.1 -P 3306 --protocol=tcp \
+      -u root --password="${DB_ROOT}" 2>/dev/null; then
+    echo "Database ready (${MYSQL_ID})"
+    break
+  fi
+  echo "Waiting for DB ($i/60)..."
+  sleep 2
+done
+
+if [[ -z "${MYSQL_ID}" ]]; then
+  echo "ERROR: mysql service not found"
+  docker compose -p "${COMPOSE_PROJECT}" ${COMPOSE} ps
+  exit 1
+fi
+
+NETWORK="$(docker inspect "${MYSQL_ID}" --format '{{range $n, $v := .NetworkSettings.Networks}}{{$n}}{{end}}' | head -1)"
+echo "Docker network: ${NETWORK}"
+
+echo "Step 2: DB connectivity test (hostname: mysql)..."
+docker run --rm \
+  --network "${NETWORK}" \
+  mysql:8.0 \
+  mysql -h mysql -u"${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" -e "SELECT 1 AS db_ok"
+
+echo "MySQL version:"
+docker exec "${MYSQL_ID}" mysql -uroot -p"${DB_ROOT}" -e "SELECT VERSION();"
+
+echo "Step 3: CI smoke (web container)..."
+docker compose -p "${COMPOSE_PROJECT}_ci" ${COMPOSE} -f docker-compose.ci.yml up -d web
+
+WEB_ID=""
+success=0
+for i in $(seq 1 60); do
+  WEB_ID="$(docker compose -p "${COMPOSE_PROJECT}_ci" ${COMPOSE} -f docker-compose.ci.yml ps -q web 2>/dev/null | head -1)"
+  if [[ -n "${WEB_ID}" ]] &amp;&amp; docker exec "${WEB_ID}" curl -fsS -o /dev/null http://localhost/index.php 2>/dev/null; then
+    echo "Web smoke OK (attempt $i)"
+    success=1
+    break
+  fi
+  sleep 2
+done
+
+docker compose -p "${COMPOSE_PROJECT}_ci" ${COMPOSE} -f docker-compose.ci.yml down -v || true
+
+if [[ "$success" -ne 1 ]]; then
+  echo "Web smoke test failed"
+  [[ -n "${WEB_ID}" ]] &amp;&amp; docker logs --tail=50 "${WEB_ID}" || true
+  exit 1
+fi
+
+echo "All tests passed"
+</command>
+    </hudson.tasks.Shell>
+  </builders>
+  <publishers>
+    <hudson.tasks.BuildTrigger>
+      <childProjects>job3</childProjects>
+      <threshold>
+        <name>SUCCESS</name>
+        <ordinal>0</ordinal>
+        <color>BLUE</color>
+        <completeBuild>true</completeBuild>
+      </threshold>
+    </hudson.tasks.BuildTrigger>
+  </publishers>
+  <buildWrappers/>
+</project>
