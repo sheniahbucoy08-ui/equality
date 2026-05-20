@@ -192,15 +192,22 @@ function Invoke-ActionPush {
     $env:GITHUB_TOKEN = $GithubToken
     $remote = "https://x-access-token:${GithubToken}@github.com/${GithubRepo}.git"
     Write-Host "Pushing to ${GithubRepo} (branch ${Branch}) ..."
-    git add -A
-    git reset HEAD -- .env .env.local .jenkins-token 2>$null
-    if (-not (git diff --cached --quiet)) {
-        git commit -m $Message
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        git add -A 2>&1 | Out-Null
+        git reset HEAD -- .env .env.local .jenkins-token 2>&1 | Out-Null
+        if (-not (git diff --cached --quiet 2>&1)) {
+            git commit -m $Message 2>&1 | Out-Null
+        }
+        git fetch $remote $Branch 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) { git rebase FETCH_HEAD 2>&1 | Out-Null }
+        git push $remote "HEAD:${Branch}" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "git push failed (exit $LASTEXITCODE)" }
+        Write-Host "GitHub push OK"
+    } finally {
+        $ErrorActionPreference = $prevEap
     }
-    git fetch $remote $Branch 2>$null
-    if ($LASTEXITCODE -eq 0) { git rebase FETCH_HEAD 2>$null }
-    git push $remote "HEAD:${Branch}"
-    Write-Host "GitHub push OK"
 }
 
 function Get-JenkinsLastBuild {
