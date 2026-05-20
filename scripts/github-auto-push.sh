@@ -38,7 +38,13 @@ fi
 
 if [[ "$HAS_CHANGES" -eq 1 ]]; then
   git add -A
-  git commit -m "$COMMIT_MESSAGE" || true
+  # Never commit local secrets (even if .env was previously tracked)
+  git reset HEAD -- .env .env.local .jenkins-token 2>/dev/null || true
+  if git diff --cached --quiet; then
+    echo "No safe changes to commit (secret files excluded)"
+  else
+    git commit -m "$COMMIT_MESSAGE" || true
+  fi
 else
   echo "No changes to commit"
 fi

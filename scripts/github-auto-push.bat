@@ -45,7 +45,13 @@ git diff-index --quiet HEAD -- >nul 2>&1
 set HAS_CHANGES=%ERRORLEVEL%
 if %HAS_CHANGES% neq 0 (
     git add -A
-    git commit -m "!COMMIT_MESSAGE!"
+    git reset HEAD -- .env .env.local .jenkins-token 2>nul
+    git diff --cached --quiet >nul 2>&1
+    if !ERRORLEVEL! equ 0 (
+        echo No safe changes to commit (secret files excluded)
+    ) else (
+        git commit -m "!COMMIT_MESSAGE!"
+    )
 )
 
 echo Syncing with remote...

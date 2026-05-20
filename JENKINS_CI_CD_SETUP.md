@@ -21,10 +21,10 @@ powershell -ExecutionPolicy Bypass -File scripts/complete-setup.ps1
 # 2. Create Jenkins API token → writes JENKINS_API_TOKEN to .env
 powershell -ExecutionPolicy Bypass -File scripts/jenkins-create-api-token.ps1
 
-# 3. Edit .env: GITHUB_TOKEN, GITHUB_REPO, DB passwords
+# 3. Edit .env: GITHUB_TOKEN, GITHUB_REPO, DB passwords (never commit .env)
 
 # 4. Run full pipeline (GitHub push + Jenkins job1/2/3)
-powershell -ExecutionPolicy Bypass -File scripts/ci-cd-auto.ps1
+ 
 ```
 
 ## URLs
