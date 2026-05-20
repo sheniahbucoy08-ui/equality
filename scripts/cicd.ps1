@@ -213,9 +213,11 @@ function Invoke-ActionPush {
 function Get-JenkinsLastBuild {
     param([string]$Job)
     $pair = "${JenkinsUser}:${JenkinsToken}"
+    $raw = curl.exe -s -u $pair -w "%{http_code}" "$JenkinsUrl/job/$Job/lastBuild/api/json" -o "$env:TEMP\jenkins-last.json"
+    $code = $raw.Trim()
+    if ($code -eq "404" -or $code -notmatch "^2") { return 0 }
     try {
-        $j = curl.exe -fsS -u $pair "$JenkinsUrl/job/$Job/lastBuild/api/json" | ConvertFrom-Json
-        return [int]$j.number
+        return [int]((Get-Content "$env:TEMP\jenkins-last.json" -Raw | ConvertFrom-Json).number)
     } catch { return 0 }
 }
 
@@ -225,7 +227,9 @@ function Invoke-JenkinsBuild {
     $before = Get-JenkinsLastBuild -Job $Job
     $uri = "$JenkinsUrl/job/$Job/build?delay=0sec"
     for ($a = 1; $a -le 5; $a++) {
-        $crumb = curl.exe -fsS -u $pair "$JenkinsUrl/crumbIssuer/api/json" | ConvertFrom-Json
+        $crumbRaw = curl.exe -s -u $pair "$JenkinsUrl/crumbIssuer/api/json"
+        if (-not $crumbRaw) { Start-Sleep -Seconds 5; continue }
+        $crumb = $crumbRaw | ConvertFrom-Json
         $hdr = "$($crumb.crumbRequestField): $($crumb.crumb)"
         $code = curl.exe -X POST -u $pair -H $hdr -s -o NUL -w "%{http_code}" $uri
         if ($code -in @("201", "200", "302")) {
@@ -246,10 +250,15 @@ function Wait-JenkinsBuild {
     $pair = "${JenkinsUser}:${JenkinsToken}"
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     while ((Get-Date) -lt $deadline) {
-        $j = curl.exe -fsS -u $pair "$JenkinsUrl/job/$Job/$Num/api/json" | ConvertFrom-Json
-        if ($j.building) { Write-Host "  $Job #$Num building..." }
-        elseif ($j.result -eq "SUCCESS") { Write-Host "  $Job #$Num SUCCESS"; return $true }
-        elseif ($j.result) { Write-Host "  $Job #$Num $($j.result)"; return $false }
+        $path = "$env:TEMP\jenkins-build.json"
+        $httpCode = curl.exe -s -u $pair -w "%{http_code}" "$JenkinsUrl/job/$Job/$Num/api/json" -o $path
+        $httpCode = $httpCode.Trim()
+        if ($httpCode -match "^2") {
+            $j = Get-Content $path -Raw | ConvertFrom-Json
+            if ($j.building) { Write-Host "  $Job #$Num building..." }
+            elseif ($j.result -eq "SUCCESS") { Write-Host "  $Job #$Num SUCCESS"; return $true }
+            elseif ($j.result) { Write-Host "  $Job #$Num $($j.result)"; return $false }
+        }
         Start-Sleep -Seconds 15
     }
     throw "Timeout: $Job #$Num"
