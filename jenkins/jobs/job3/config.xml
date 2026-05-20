@@ -24,8 +24,8 @@
     <hudson.tasks.Shell>
       <command>#!/bin/bash
 set -eux
-bash /var/jenkins_home/ci-scripts/jenkins-checkout.sh
-bash /var/jenkins_home/ci-scripts/jenkins-deploy-app.sh
+bash /var/jenkins_home/ci-scripts/jenkins-ci.sh checkout
+bash /var/jenkins_home/ci-scripts/jenkins-ci.sh deploy
 </command>
     </hudson.tasks.Shell>
   </builders>

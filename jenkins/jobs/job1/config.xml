@@ -25,7 +25,7 @@
       <command>#!/bin/bash
 set -eux
 
-bash /var/jenkins_home/ci-scripts/jenkins-checkout.sh
+bash /var/jenkins_home/ci-scripts/jenkins-ci.sh checkout
 
 echo "======================================"
 echo "Job1 - EqualVoice Build #${BUILD_NUMBER}"

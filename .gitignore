@@ -3,9 +3,10 @@
 .env.local
 .jenkins-token
 
-# Extracted reference / archives
+# Reference archives (not part of this project)
 hrms-main-ref/
 hrms-main.zip
+hrms-main references/
 
 # IDE
 .vscode/
