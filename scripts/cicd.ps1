@@ -131,6 +131,10 @@ function Invoke-ActionJobs {
         Wait-JenkinsContainer
         Wait-JenkinsHttp
     }
+    Wait-JenkinsHttp
+    Invoke-JenkinsReload
+    Start-Sleep -Seconds 3
+    Wait-JenkinsJobs
     Write-Host "Jenkins jobs: $JenkinsUrl (job1 build, job2 test, job3 deploy)"
 }
 
@@ -210,9 +214,44 @@ function Invoke-ActionPush {
     }
 }
 
+function Get-JenkinsAuthPair {
+    if ($JenkinsToken) { return "${JenkinsUser}:${JenkinsToken}" }
+    if ($env:JENKINS_ADMIN_PASSWORD) { return "${JenkinsUser}:$($env:JENKINS_ADMIN_PASSWORD)" }
+    return $null
+}
+
+function Invoke-JenkinsReload {
+    $pair = Get-JenkinsAuthPair
+    if (-not $pair) { return }
+    $crumbRaw = curl.exe -s -u $pair "$JenkinsUrl/crumbIssuer/api/json"
+    if (-not $crumbRaw) { return }
+    $crumb = $crumbRaw | ConvertFrom-Json
+    $hdr = "$($crumb.crumbRequestField): $($crumb.crumb)"
+    $code = curl.exe -s -o NUL -w "%{http_code}" -u $pair -H $hdr -X POST "$JenkinsUrl/reload"
+    $code = $code.Trim()
+    if ($code -notin @("200", "201", "302")) { Write-Warning "Jenkins reload returned HTTP $code" }
+}
+
+function Wait-JenkinsJobs {
+    param([int]$Max = 60)
+    $pair = Get-JenkinsAuthPair
+    if (-not $pair) { return }
+    $need = @("job1", "job2", "job3")
+    for ($i = 1; $i -le $Max; $i++) {
+        $raw = curl.exe -s -g -u $pair "$JenkinsUrl/api/json?tree=jobs%5Bname%5D"
+        if ($raw) {
+            $names = @((($raw | ConvertFrom-Json).jobs | ForEach-Object { $_.name }))
+            if (($need | Where-Object { $_ -notin $names }).Count -eq 0) { return }
+        }
+        Start-Sleep -Seconds 2
+    }
+    throw "Jenkins jobs not loaded (expected job1, job2, job3). Try: .\scripts\cicd.ps1 -Action jobs -Restart"
+}
+
 function Get-JenkinsLastBuild {
     param([string]$Job)
-    $pair = "${JenkinsUser}:${JenkinsToken}"
+    $pair = Get-JenkinsAuthPair
+    if (-not $pair) { return 0 }
     $raw = curl.exe -s -u $pair -w "%{http_code}" "$JenkinsUrl/job/$Job/lastBuild/api/json" -o "$env:TEMP\jenkins-last.json"
     $code = $raw.Trim()
     if ($code -eq "404" -or $code -notmatch "^2") { return 0 }
@@ -223,7 +262,8 @@ function Get-JenkinsLastBuild {
 
 function Invoke-JenkinsBuild {
     param([string]$Job)
-    $pair = "${JenkinsUser}:${JenkinsToken}"
+    $pair = Get-JenkinsAuthPair
+    if (-not $pair) { return $null }
     $before = Get-JenkinsLastBuild -Job $Job
     $uri = "$JenkinsUrl/job/$Job/build?delay=0sec"
     for ($a = 1; $a -le 5; $a++) {
@@ -231,7 +271,7 @@ function Invoke-JenkinsBuild {
         if (-not $crumbRaw) { Start-Sleep -Seconds 5; continue }
         $crumb = $crumbRaw | ConvertFrom-Json
         $hdr = "$($crumb.crumbRequestField): $($crumb.crumb)"
-        $code = curl.exe -X POST -u $pair -H $hdr -s -o NUL -w "%{http_code}" $uri
+        $code = (curl.exe -X POST -u $pair -H $hdr -s -o NUL -w "%{http_code}" $uri).Trim()
         if ($code -in @("201", "200", "302")) {
             $deadline = (Get-Date).AddSeconds(120)
             while ((Get-Date) -lt $deadline) {
@@ -247,7 +287,7 @@ function Invoke-JenkinsBuild {
 
 function Wait-JenkinsBuild {
     param([string]$Job, [int]$Num, [int]$TimeoutSec)
-    $pair = "${JenkinsUser}:${JenkinsToken}"
+    $pair = Get-JenkinsAuthPair
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     while ((Get-Date) -lt $deadline) {
         $path = "$env:TEMP\jenkins-build.json"
