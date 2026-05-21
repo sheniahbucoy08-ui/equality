@@ -102,3 +102,4 @@ equalvoice/
 | Push blocked (secret in commit) | Remove `.env` from git: `git rm --cached .env` |
 | Jenkins 401 | `.\scripts\cicd.ps1 -Action token -UseEnvPassword` |
 | Port 9090 busy | Stop other Jenkins: `docker stop jenkins` |
+cd c:\xampp\htdocs\equalvoice; powershell -ExecutionPolicy Bypass -File scripts\cicd.ps1
